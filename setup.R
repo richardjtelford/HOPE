@@ -35,6 +35,8 @@ CRAN_needed <- read.table(header = TRUE, stringsAsFactors = FALSE, text =
    ggfortify
    ggrepel
    neotoma
+   foreach
+   doMC
   ")$package
 
 #check against currently installed packages
