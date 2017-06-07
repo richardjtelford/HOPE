@@ -203,7 +203,15 @@ lastDigit <- plyr::ldply(allPollenCounts, function(x){
 })
 
 
-lastDigit %>%  group_by(.id) %>% spread(key = value, value = n) %>% filter(`1` < `8`) %>% gather(key = n, value = value, -.id)  %>% mutate(n = factor(n, levels = c(1L:9L, 0L))) %>% ggplot(aes(n, value, fill = as.factor(n))) + geom_col() + scale_fill_brewer(palette = "Paired") + facet_wrap(~.id, scales = "free_y")
+lastDigit %>%  
+  group_by(.id) %>% 
+  spread(key = value, value = n) %>% 
+  filter(`1` < `8`) %>% 
+  gather(key = n, value = value, -.id)  %>% 
+  mutate(n = factor(n, levels = c(1L:9L, 0L))) %>% 
+  ggplot(aes(n, value, fill = as.factor(n))) + 
+  geom_col() + scale_fill_brewer(palette = "Paired") + 
+  facet_wrap(~.id, scales = "free_y")
 
 
 
