@@ -7,24 +7,27 @@ doMC::registerDoMC(cores = 3)
 
 
 ####download pollen
-allPollenSites <- get_dataset(datasettype = "pollen")
-allPollenIDs <- sapply(allPollenSites, FUN = function(x) x$dataset$dataset.id)
-allPollenData <- get_download(allPollenIDs)
-save(allPollenSites, allPollenData, file = "allPollenData.RData")
+if(FALSE){ #SLOW
+  allPollenSites <- get_dataset(datasettype = "pollen")
+  allPollenIDs <- sapply(allPollenSites, FUN = function(x) x$dataset$dataset.id)
+  allPollenData <- get_download(allPollenIDs)
+  save(allPollenSites, allPollenData, file = "allPollenData.RData")
+}
+
+#load data
 load("allPollenData.RData")
 
 
-#map
+#map of datasets
 mp <- map_data("world")
 plyr::ldply(allPollenData, function(x)x$dataset$site.data) %>% 
   ggplot(aes(x = long, y = lat)) + 
- geom_map(data = mp, map = mp, mapping = aes(map_id = region), fill = "grey80") +
-  scale_x_continuous(expand = c(0,0)) +
-  scale_y_continuous(limits = c(-70, NA), expand = c(0,0)) +
-  geom_point() + 
-  coord_quickmap() +
-  labs(x = "Longitude E°", y = "Latiude N°")
-  theme
+    geom_map(data = mp, map = mp, mapping = aes(map_id = region), fill = "grey80") +
+    scale_x_continuous(expand = c(0,0)) +
+    scale_y_continuous(limits = c(-70, NA), expand = c(0,0)) +
+    geom_point() + 
+    coord_quickmap() +
+    labs(x = "Longitude E°", y = "Latiude N°")
 
 
 #taxonomy
@@ -203,7 +206,6 @@ lastDigit <- plyr::ldply(allPollenCounts, function(x){
 lastDigit %>%  group_by(.id) %>% spread(key = value, value = n) %>% filter(`1` < `8`) %>% gather(key = n, value = value, -.id)  %>% mutate(n = factor(n, levels = c(1L:9L, 0L))) %>% ggplot(aes(n, value, fill = as.factor(n))) + geom_col() + scale_fill_brewer(palette = "Paired") + facet_wrap(~.id, scales = "free_y")
 
 
-BCI %>% gather() %>% filter(value > 0) %>% mutate(value = value %% 10) %>% ggplot(aes(x = value)) + geom_bar()
 
 ## multiple
 allCountSums %>% filter(ptaxon > 7) %>% ggplot(aes(x = mult)) + geom_histogram()
