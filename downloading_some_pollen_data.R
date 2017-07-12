@@ -92,6 +92,12 @@ nonDec %>% count(.id) %>% arrange(n) %>% print(n = Inf)
 
 nonDec %>% filter(!grepl("Pinus|Picea|Abies", taxon)) %>% count(.id) %>% arrange(n) %>% print(n = Inf) 
 
+#weird Conifers
+nonDec %>% filter(grepl("Pinus|Picea|Abies|Tsuga|Podocarpus", taxon)) %>% 
+  mutate(fract = round(count %% 1, 3)) %>% 
+  count(fract) 
+
+
 
 
 #countSums, singletons
