@@ -78,7 +78,7 @@ But what to do with 170 MB of data?
 The first thing I do with any data-set is to test it for oddities: improbably values or patterns that might indicate errors or misunderstandings. I developed a set of methods last year to test the ever-so curious chironomid data from [Lake Żabińskie](https://quantpalaeo.wordpress.com/tag/larocque-tobler-et-al-2015/): I'm looking forward to applying them to this huge amount of pollen data.
 
 
-## Expections: counts should be integers
+## Expections 1: counts should be integers
 
 The vast majority of the pollen data in Neotoma is labelled as being count data - I've omitted a small amount labelled as percent data. Counts should be integers, so any non-integers values would be cause for concern except that pollen analysis often count half grains of _Pinus_ and some other conifers (some _Tsuga_, _Podocarpus_, Pinaceae) with pollen which often splits into two identifiable parts (half counts are also common in diatom and chironomid counts). So I am expecting integer and half values for some conifer species but that is not what I found.
 
@@ -142,6 +142,7 @@ many_not_int <- notPinus %>%
 many_not_int %>% filter(Proportion > 0.5) %>% 
   knitr::kable(digits = 2L, caption = "Table 1: Proportion and number of non-integer values.")
 ```
+
 We can examine these data sets with the `browse` function.
 ```{r echo = TRUE, eval = FALSE}
 browse(16090)
@@ -150,7 +151,7 @@ browse(15059)
 browse(16209)
 browse(16210) 
 ```
-The very high numbers in 16090 suggest that these are influx or concentration data - one would need to check the original publication. The others look more like percent data, but need to check as the values sum to more that 100 in each sample for all but 15059. 
+The very high numbers in 16090 suggest that these are influx or concentration data - one would need to check the original publication. The others look more like percent data, but need to check as the values sum to more that 100 in each sample for all but 15059. I'm going to drop these data sets from the remainder of my analysis.
 
 
 ```{r, include=FALSE}
@@ -203,22 +204,59 @@ browse(13051) # couple very odd Cyperaceae
 browse(14938) 
 ```
 
+I'm going to ignore these for now and round all fractional values up.
 
+```{r, round_up}
+allPollen <- allPollen %>% mutate(count = ceiling(count))
+```
 
+## Expectation 2: Count sums should be reasonable
 
+Many people count three hundred or five hundred pollen grains per sample. I don't think anyone ever counted twenty thousand grains per sample. It would just take too long. 
+
+High counts might indicate that influx/accumulation rates have been entered instead of counts. Alternatively, some palanyologists might be really enthusiastic, or, in low diversity samples, the abundance of the dominant taxon might be estimated which could lead to high counts without high effort. 
+
+```{r countSums}
+countSums <- allPollen %>% 
+  group_by(.id, sampleID) %>% 
+  summarise(countSum = sum(count), mx = max(count))
+
+high <- 5000
+highCounts <- countSums %>% 
+  group_by(.id) %>% 
+  mutate(high = countSum > high) %>% 
+  summarise(Proportion = mean(high), Number = sum(high), min = min(countSum), median = median(countSum), max = max(countSum)) %>% 
+  filter(Proportion > 0) %>% 
+  arrange(desc(max))
+```
+
+The data reports counts as high as `r max(countSums$countSum)`. I'm going to arbitrarily set `r high` as my threshold for concern. These are some of the `r nrow(highCounts)` data sets count sums over `r high`.
+
+```{r}
+highCounts %>% knitr::kable(digits = c(0, 2, 0, 0, 0, 0))
+```
 
 ```{r, eval = FALSE}
-#zap duff data
-allPollenCounts$'16090' <- NULL #?pollen influx rates
-allPollenCounts$`16210` <- NULL #?percent
-allPollenCounts$`16209` <- NULL #?percent
-allPollenCounts$`15696` <- NULL #?percent
-allPollenCounts$`15059` <- NULL #?percent
+browse(4355)
+browse(4404)
+browse(14556) 
+
+allPollen %>% filter(species == "Lycopodium", count > 1000) %>% count(.id)
+
+allPollen %>% filter(species == "Lycopodium") %>% ggplot(aes(x = count)) + geom_histogram() + xlim(0, 1000)
+
+```
+
+Some of these are probably easy to explain. 4355 is either in the middle of the densest stand of _Lycopodium_ since the Carboniferous, or the Lycopodium spike has been mis-labelled.
 
 
-allPollenCounts$`17391` <- NULL #Mostly OK, some weird data 0.01
-allPollenCounts$`17357` <- NULL #Mostly OK, some weird data 0.1
+```{r}
+countSums %>% ggplot(aes(x = countSum)) + 
+    geom_bar(width = 1)
 
+```
+
+```{r, eval = FALSE}
 allPollenCounts$'488' <- NULL #?pollen influx rates - all integers but far too high
 
 
