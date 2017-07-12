@@ -17,4 +17,12 @@
 *.mdb
 *.zip
 
+#markdown cache
+*_cache/
+*_files/
 
+#outputFiles
+*.csv
+
+#datafile
+*.RData
