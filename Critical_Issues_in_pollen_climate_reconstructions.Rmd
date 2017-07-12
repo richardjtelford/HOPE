@@ -1,0 +1,162 @@
+---
+title: "Critical issues in pollen-climate reconstructions"
+subtitle: "PC-MIP Pollen-Climate Model Intercomparison Project"
+author: 
+ name: "Richard J. Telford <br> Department of Biology, University of Bergen"
+date: "Caux, 13^th^ June 2017"
+output: 
+ ioslides_presentation:
+  widescreen: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library("tidyverse")
+```
+
+## Route map
+
+ - Spatial autocorrelation and model performance
+ - Model selection
+ - Multiple variables
+ - Reconstruction diagnostics
+ - Climate reconstruction in a perfect model world
+
+ 
+## Spatial autocorrelation
+
+Microfossil assemblages and environmental conditions at adjacent sites are more similar than expected by chance  
+
+- lack of independence of observations
+- violates basic assumption of most statistical methods
+- model performance is over-optimistic  
+- reconstruction uncertainty is underestimated
+- can result in spurious reconstructions 
+ 
+
+<div class = "notes">
+ - recognised as a problem by Francis Galton in 1888
+</div>
+ 
+##Plantkic foraminifera{.columns-2}
+```{r autocor, out.width=500}
+knitr::include_graphics("pollen_workshop/spatial_structures.png")
+```
+```{r autocor2, out.width=500}
+data_frame(range = rep(c(0, 500, 2000, 10000), each = 5), method =factor( rep(c("MAT", "ANN", "WAPLS", "WA", "ML"), times = 4), levels = c("MAT", "ANN", "WAPLS", "WA", "ML")), r2 = c(0,0,0,0,0, 0.22,.17,.1,.05,.03, 0.63,.58,.35,.19,.19, 0.85,.82,.65,.54,.51)) %>%
+  ggplot(aes(range, r2, colour = method)) + 
+  geom_line() + 
+  geom_point() + 
+  labs(x = "Effective range, km", y = expression(Median~r^2), colour = "Method", title = expression(Median~r^2~against~spatial~range)) +
+  ylim(0, 1) + theme_bw(base_size = 16)
+``` 
+
+## Spatial autocorrelation solutions
+ 
+ - avoid sensitive methods (especially MAT) 
+ - h-block cross-validation
+ - model-based solution
+
+
+## _h_-block cross-validation
+
+Omit samples from within h-km of target sample during cross-validation
+
+ ```{r hblock, out.width=500}
+knitr::include_graphics("https://quantpalaeo.files.wordpress.com/2013/12/hblock-1.png")
+```
+ 
+## Determining _h_
+
+ ```{r hblock2, out.width=800}
+knitr::include_graphics("https://quantpalaeo.files.wordpress.com/2013/12/hblock-6.png")
+```
+
+
+<div class = "notes">
+ - NB k-fold cross-validation is NOT a solution
+</div>
+
+## Method selection 
+
+Deshrinking 
+
+```{r deshrinking, echo = FALSE, results = "hide", fig.width = 5,fig.height = 5, message = FALSE}
+library(rioja)
+data(SWAP)
+mod <- crossval(WA(SWAP$spec, SWAP$pH))
+plot(mod, xval = TRUE, xlab = "Measured pH", ylab = "Reconstructed pH", add.smooth = TRUE)
+
+```
+
+##
+
+- WA with monotonic deshrinking typically beats other WA-based methods
+- WA inappropriate if taxa have multimodal distributions
+
+MAT often appears to have better performance than WA 
+
+ - often spurious, driven by autocorrelation
+ 
+Bayesian methods very promising
+
+
+## Variable selection
+
+- Importance in the calibration set does not mean variable is ecologically important down-core
+
+- Reconstruction significance tests can help
+
+## Reconstruction diagnostics{.columns-2}
+
+ ```{r reconDiag, out.width=500}
+knitr::include_graphics(" https://quantpalaeo.files.wordpress.com/2016/04/analoguechunk-1.png")
+```
+ 
+ - Distance to nearest analogue
+ - Residual distance
+ - Reconstruction significance tests
+ 
+
+## Reconstructions in a perfect model world
+
+Test transfer functions methods on a Holocene vegetation-climate simulation
+ 
+ - 6000 year ECHAM5/MPIOM simulation
+ - JSBACH vegetation module  
+
+- Rehfeld et al (2016) Climate of the Past
+
+
+## The simulations
+
+```{r rehfeld1, out.width=1000}
+knitr::include_graphics("pollen_workshop/Fig1-1.png")
+```
+
+
+## Protocol
+
+```{r rehfeld2, out.width=1000}
+knitr::include_graphics("pollen_workshop/Fig2-1.png")
+```
+
+
+## Simulated and reconstructed climate
+
+```{r rehfeld3, out.width=1000}
+knitr::include_graphics("pollen_workshop/Fig3-1.png")
+```
+
+
+## Correlations between warmest and coolest seasons
+
+```{r rehfeld4, out.width=1000}
+knitr::include_graphics("pollen_workshop/Fig4-1.png")
+```
+
+## Conclusions
+
+- Be careful
+- Be critical
+
