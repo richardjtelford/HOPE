@@ -241,15 +241,16 @@ browse(4355)
 browse(4404)
 browse(14556) 
 
-allPollen %>% filter(species == "Lycopodium", count > 1000) %>% count(.id)
+allPollen %>% filter(species == "Lycopodium", count > 500) %>% count(.id)
+allPollen %>% filter(species == "Eucalyptus", count > 500) %>% count(.id)
 
 allPollen %>% filter(species == "Lycopodium") %>% ggplot(aes(x = count)) + geom_histogram() + xlim(0, 1000)
 
 ```
 
-Some of these are probably easy to explain. 4355 is either in the middle of the densest stand of _Lycopodium_ since the Carboniferous, or the Lycopodium spike has been mis-labelled.
+Some of these are probably easy to explain. 4355 is either in the middle of the densest stand of _Lycopodium_ since the Carboniferous, or the Lycopodium spike has been mis-labelled. Likewise, the _Eucalyptus_ count suggests that 4095 (Hockham Mere) is a portal to the antipodes.
 
-
+ 
 ```{r}
 countSums %>% ggplot(aes(x = countSum)) + 
     geom_bar(width = 1)
