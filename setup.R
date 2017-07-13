@@ -23,10 +23,10 @@ CRAN_needed <- read.table(header = TRUE, stringsAsFactors = FALSE, text =
   "package
    tidyverse #this includes dplyr, ggplot, tidyr etc
    vegan
-   RSQLite
    assertthat
    plyr
    devtools
+   english
    cowplot
    gridExtra
    rmarkdown
