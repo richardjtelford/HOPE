@@ -4,11 +4,12 @@ author: "Richard J. Telford"
 date: "June 5, 2017"
 output: 
   html_document:
-    self_contained: no 
+    self_contained: no
+    keep_md: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, cache = TRUE, autodep = TRUE)
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, autodep = TRUE, message = FALSE, warning = FALSE)
 
 #load packages
 library("tidyverse")
@@ -17,6 +18,7 @@ library("english")
 as.English <- function(x){
   gsub("([[:alpha:]])(.+)", "\\U\\1\\L\\2", as.english(x), perl = TRUE)
 }
+pc <- function(x, digits = 0) round(x * 100, digits = digits)
 
 #register parallel backend
 doMC::registerDoMC(cores = 3)
@@ -55,7 +57,7 @@ allPollenCounts <- allPollenCounts[sapply(allPollenCounts, ncol) > 0]
 
 
 
-A couple of months ago, Eric Grimm gave introduction to the [Neotoma database](https://www.neotomadb.org/) in Bergen for participants in the HOPE project (PhD and postdoc positions to be advertised soon).
+A couple of months ago, Eric Grimm gave introduction to the [Neotoma database](https://www.neotomadb.org/) in Bergen for participants in the HOPE project ([PhD and postdoc positions](https://quantpalaeo.wordpress.com/2017/07/17/forthcoming-quantitative-palaeoecology-phd-and-postdoc-positions-in-bergen/) to be advertised soon).
 
 I started to tinker with the neotoma R package and downloaded some fossil pollen data. Actually, all the pollen data: over `r signif(length(allPollenCounts), 2)` sites; `r signif(sum(sapply(allPollenCounts, nrow))/1000, 2)` thousand levels; and `r sum(sapply(allPollenCounts, sum)) %>% signif(2)/1000000` million terrestrial spores and pollen grains. 
 
@@ -75,12 +77,12 @@ rm(mp)#clean up
 
 But what to do with 170 MB of data?
 
-The first thing I do with any data-set is to test it for oddities: improbably values or patterns that might indicate errors or misunderstandings. I developed a set of methods last year to test the ever-so curious chironomid data from [Lake Żabińskie](https://quantpalaeo.wordpress.com/tag/larocque-tobler-et-al-2015/): I'm looking forward to applying them to this huge amount of pollen data.
+The first thing I do with any data-set is to test it for oddities: improbably values or patterns that might indicate errors or misunderstandings. I developed a set of methods last year to test the ever-so curious chironomid data from [Lake Żabińskie](https://quantpalaeo.wordpress.com/tag/larocque-tobler-et-al-2015/): I'm looking forward to applying them to this huge amount of pollen data. 
 
 
 ## Expections 1: counts should be integers
 
-The vast majority of the pollen data in Neotoma is labelled as being count data - I've omitted a small amount labelled as percent data. Counts should be integers, so any non-integers values would be cause for concern except that pollen analysis often count half grains of _Pinus_ and some other conifers (some _Tsuga_, _Podocarpus_, Pinaceae) with pollen which often splits into two identifiable parts (half counts are also common in diatom and chironomid counts). So I am expecting integer and half values for some conifer species but that is not what I found.
+The vast majority of the pollen data in Neotoma is labelled as being count data - I've omitted a small amount labelled as percent data. Counts should be integers, so any non-integers values would be cause for concern except that pollen analysts often count half grains of _Pinus_ and some other conifers (some _Tsuga_, _Podocarpus_, Pinaceae) with pollen which often splits into two identifiable parts (half counts are also common in diatom and chironomid counts). So I am expecting integer and half values for some conifer species but that is not what I found.
 
 ```{r, include = FALSE}
 processPollen <- . %>% 
@@ -107,12 +109,13 @@ nearInt <- allPollen %>%
 allPollen <- allPollen %>% 
   mutate(count = round(count, 3))
 ```
-The vast majority of counts are integer (or half) values; only `r nNon_Int$'FALSE'` (`r (nNon_Int$'FALSE'/sum(nNon_Int) * 100) %>% signif(2)`%) are not. 
+The vast majority of counts are integer (or half) values; only `r nNon_Int$'FALSE'` (`r (nNon_Int$'FALSE'/sum(nNon_Int)) %>% pc(1)`%) are not. 
 
 Of these, `r nearInt` are near integer (or half) values (absolute difference less than `r thresh`). These are probably because some of the count data have been back-calculated from percent data (or read off pollen diagrams) and there are rounding errors. These errors are inconsequential and are trivial to fix.
 
 ```{r pinus}
-conifers <- allPollen %>% filter(grepl("^Pinus|^Picea|^Abies|^Pinaceae|^Tsuga|^Podocarp", species)) %>% 
+pinus <- "^Pinus|^Picea|^Abies|^Pinaceae|^Tsuga|^Podocarp|^Acer"
+conifers <- allPollen %>% filter(grepl(pinus, species)) %>% 
   count(val = round(count %% 1, 3)) 
 
 ```
@@ -122,11 +125,11 @@ The counts for Pinaceae were more variable that I had imagined. While the vast m
 
 I also discovered that some analysts count _Acer_ grains in thirds.
 
-Excluding the conifers and Acer which have non-integer counts, there are still several thousand non-integer counts in the database. These may represent typos, which should be sporadic, or indicate that the data are not counts, but are instead percent or pollen concentration/influx data, which might have pervasive non-integer values. It is also possible that some analysts count half grains of a broader range of taxa, in which case the non-integers should be restricted to a few taxa.
+Excluding the conifers and _Acer_ which have non-integer counts, there are still several thousand non-integer counts in the database. These may represent typos, which should be sporadic, or indicate that the data are not counts, but are instead percent or pollen concentration/influx data, which might have pervasive non-integer values. It is also possible that some analysts count half grains of a broader range of taxa, in which case the non-integers should be restricted to a few taxa.
 
 ```{r}
 notPinus <- allPollen %>%
-  filter(!grepl("^Pinus|^Picea|^Abies|^Pinaceae|^Tsuga|^Podocarp|^Acer", species)) %>% 
+  filter(!grepl(pinus, species)) %>% 
   mutate(int  = count %% 1 == 0)
 
 many_not_int <- notPinus %>% 
@@ -154,6 +157,9 @@ browse(16210)
 The very high numbers in 16090 suggest that these are influx or concentration data - one would need to check the original publication. The others look more like percent data, but need to check as the values sum to more that 100 in each sample for all but 15059. I'm going to drop these data sets from the remainder of my analysis.
 
 
+
+
+
 ```{r, include=FALSE}
 allPollen %>% 
   semi_join(many_not_int %>% filter(Proportion > 0.5)) %>% 
@@ -167,6 +173,8 @@ allPollen <- allPollen %>%
 notPinus <- notPinus %>% 
   anti_join(many_not_int %>% filter(Proportion > 0.5)) 
 
+
+allPollen %>% filter(grepl(pinus, species)) %>% count(count) # better now
 ```
 
 The other samples with non-integer values mostly have half integers. These could be from calculating percent from a count sum of 200, or even more enthusiastic counting of half pollen grains. The remaining values look like errors of one kind or another. 
@@ -204,17 +212,13 @@ browse(13051) # couple very odd Cyperaceae
 browse(14938) 
 ```
 
-I'm going to ignore these for now and round all fractional values up.
+It should be relatively easy to flag data with unexpected non-integer, but I'm going to ignore these for now and for simplicity round all fractional values up. 
 
 ```{r, round_up}
 allPollen <- allPollen %>% mutate(count = ceiling(count))
 ```
 
 ## Expectation 2: Count sums should be reasonable
-
-Many people count three hundred or five hundred pollen grains per sample. I don't think anyone ever counted twenty thousand grains per sample. It would just take too long. 
-
-High counts might indicate that influx/accumulation rates have been entered instead of counts. Alternatively, some palanyologists might be really enthusiastic, or, in low diversity samples, the abundance of the dominant taxon might be estimated which could lead to high counts without high effort. 
 
 ```{r countSums}
 countSums <- allPollen %>% 
@@ -225,15 +229,26 @@ high <- 5000
 highCounts <- countSums %>% 
   group_by(.id) %>% 
   mutate(high = countSum > high) %>% 
-  summarise(Proportion = mean(high), Number = sum(high), min = min(countSum), median = median(countSum), max = max(countSum)) %>% 
+  summarise(Proportion = mean(high), Number = sum(high), Minimum = min(countSum), Median = median(countSum), Maximum = max(countSum)) %>% 
   filter(Proportion > 0) %>% 
-  arrange(desc(max))
+  arrange(desc(Maximum))
 ```
-
-The data reports counts as high as `r max(countSums$countSum)`. I'm going to arbitrarily set `r high` as my threshold for concern. These are some of the `r nrow(highCounts)` data sets count sums over `r high`.
+Many palynologists count three hundred or five hundred pollen grains per sample. I don't think anyone ever counted twenty thousand grains per sample. It would just take too long. 
 
 ```{r}
-highCounts %>% knitr::kable(digits = c(0, 2, 0, 0, 0, 0))
+countSums %>% ggplot(aes(x = countSum)) + 
+    geom_bar(width = 1) + 
+    scale_x_continuous(limits = c(0, 1500), expand = c(0.01, 0)) +
+    labs(x = "Count Sums (truncated at 1500)")
+```
+
+
+Very high counts might indicate that influx/accumulation rates have been entered instead of counts. Alternatively, some palanyologists might be really enthusiastic, or, in low diversity samples, the abundance of the dominant taxon might be estimated which could lead to high counts without high effort. 
+
+The data reports counts as high as `r max(countSums$countSum) %>% format(scientific = FALSE)`. I'm going to arbitrarily set `r high` as my threshold for concern. This flags `r mean(countSums$countSum > 5000)  %>% pc(1)`% of the samples. These are some of the `r nrow(highCounts)` data sets with count sums over `r high`.
+
+```{r}
+highCounts %>% head() %>% knitr::kable(digits = c(0, 2, 0, 0, 0, 0))
 ```
 
 ```{r, eval = FALSE}
@@ -248,62 +263,192 @@ allPollen %>% filter(species == "Lycopodium") %>% ggplot(aes(x = count)) + geom_
 
 ```
 
-Some of these are probably easy to explain. 4355 is either in the middle of the densest stand of _Lycopodium_ since the Carboniferous, or the Lycopodium spike has been mis-labelled. Likewise, the _Eucalyptus_ count suggests that 4095 (Hockham Mere) is a portal to the antipodes.
+Some of these are probably easy to explain. 4355 is either in the middle of the densest stand of _Lycopodium_ since the Carboniferous, or the _Lycopodium_ spike has been mis-labelled. Likewise, the _Eucalyptus_ count suggests that 4095 (Hockham Mere) is a portal to the Antipodes.
 
+```{r eval = FALSE}
+allPollen %>% filter(count > 2000) %>% arrange(desc(count))
+```
  
+Others appear to be typos. For example data set 20643 reports 4080 _Abies_ grains in the first sample: none of the other samples have more than 6 Abies _grains_. And I'm fairly sure that the two counts of 9999 for Corylus/Myrica in data set 16091 are not real. It might be possible to use taxonomic dissimilaries within the data set to identify odd samples but as data sets can span the deglaciation large taxonomic changes are expected anyway.
+
 ```{r}
-countSums %>% ggplot(aes(x = countSum)) + 
-    geom_bar(width = 1)
+## No gross outliers
+library("vegan")
+vegdist(allPollenCounts$`20643`, method = "morisita") %>% 
+  as.vector() %>% 
+  as_data_frame() %>% 
+  ggplot(aes(x = value)) + 
+    geom_histogram() +
+    labs(x = "Morista distance", title = "Data set 20643")
+```
+ 
+
+##Expectation 3: Few samples without singletons
+
+“rarity is the attribute of a vast number of species of all classes, in all countries.” [Charles Darwin](http://literature.org/authors/darwin-charles/the-origin-of-species-6th-edition/chapter-11.html)
+
+One of the curious aspects of the chironomid counts from Lake Żabińskie is the lack of [rare taxa](https://quantpalaeo.wordpress.com/2016/06/13/the-missing-rare-taxa-at-zabinskie/) in many of the samples. I suggested that it is likely that in any census of any species-rich assemblage, the rarest taxa will to be represented by a single individual.
+
+```{r}
+allCountSums <- allPollen %>% 
+  group_by(.id, sampleID) %>% 
+  summarise(countSum = sum(count), singletons = any(count == 1), minCount = min(count), richness = n()) %>% 
+  left_join(
+    plyr::ldply(allPollenCounts, ncol) %>% rename(ntaxon = V1)
+  )
+
+noSingletons_dataset <- allCountSums %>% 
+  group_by(.id, ntaxon) %>% 
+  summarise(prop = mean(!singletons)) 
+
+singleton_high <- 0.5
 
 ```
 
-```{r, eval = FALSE}
-allPollenCounts$'488' <- NULL #?pollen influx rates - all integers but far too high
+How well does the pollen data conform to this expectation. At `r (mean(!allCountSums$singletons) * 100) %>% round()`%, the proportion of samples lacked singletons is higher than I had expected. The samples without singletons are not evenly distributed: `r mean(noSingletons_dataset$prop == 0)  %>% pc`% of datasets have no samples without singletons; `r mean(noSingletons_dataset$prop > singleton_high)  %>% pc`% lack singletons in more than `r singleton_high * 100`% of samples.
 
+There is a strong relationship between the proportion of samples in a data set and the number of taxa in the data set.
 
-allCountSums <- plyr::ldply(allPollenCounts, function(x){
-    x <- ceiling(x)
-    x <- x[rowSums(x) > 0, , drop = FALSE]
-    data_frame(
-      n = 1:nrow(x),
-      counts = rowSums(x),
-      singletons = apply(x == 1, 1, any),
-      minCount = apply(x, 1, function(r){ 
-          if(sum(r) > 0) min(r[r > 0])
-          else NA
-        }),
-      ntaxon = ncol(x),
-      ptaxon = rowSums(x > 0)
-      )
-  }, .parallel = TRUE)
-
+```{r}
+noSingletons_dataset %>% 
+  ggplot(aes(x = ntaxon, y = prop * 100)) + 
+  geom_point(alpha = 0.3) +
+  labs(x = "Number of taxa in data set", y = "Percent of samples without singletons")
 ```
 
 
 
-I'm going to use it an opportunity to explore the prevalence of samples lacking species occurring only once (singletons). In any census of any species-rich community, the rarest taxa are likely to be represented by a single individual. Yet in the chironomid counts from [Lake Żabińskie](https://quantpalaeo.wordpress.com/2016/06/13/the-missing-rare-taxa-at-zabinskie/), over a third of the samples lacked species that occurred only once. Last year, I used a simulation to estimate how unlikely this was (very). Now I can use some real counts.
-
-At `r #round(mean(!allCountSums$singletons) * 100, 1)` percent, the proportion of samples lacked singletons is higher than I had expected. However, I think this is to a large extent because of the limited taxonomic resolution and scope of many of the pollen datasets. In at least the older data, it was common to focus on a limited number of good climatic indicators and to ignore, for example, rare insect-pollinated species, and taxonomic resolution was often lower than is possible now.
-
-```{r by_ntaxa, eval = FALSE}
-allCountSums %>% 
-  ggplot(aes(x = ntaxon, fill = singletons)) + 
-  geom_bar(width = 1, position = "stack") +
-  labs(x = "Number of species", y = "Number of samples in dataset", fill = "Singletons")
 
 
+```{r}
 propAbove <- function(x) {
   allCountSums %>% 
     group_by(spprich = ntaxon > x) %>% 
     count(singletons) %>% 
-    mutate(p = nn/sum(nn) * 100) %>% 
+    mutate(p = n/sum(n) * 100) %>% 
     filter(spprich, !singletons) %>% 
     ungroup() %>% 
     select(p) %>% 
     round(1)}
 ```
 
-About a fifth of samples in datasets where the number of taxa is 25 or fewer lack singletons. Conversely, only `r #propAbove(25)`% of samples from datasets with more taxa lack singletons, and `r #propAbove(40)`% of those from datasets with over 40 taxa. 
+About a fifth of samples in datasets where the number of taxa is 25 or fewer lack singletons. Conversely, only `r propAbove(25)`% of samples from datasets with more taxa lack singletons, and `r propAbove(40)`% of those from datasets with over 40 taxa. 
+
+I don't think this is a caused by low diversity, but is due to a large extent to the limited taxonomic resolution and scope of some of the pollen datasets. In at least the older data, it was common to focus on a limited number of common taxa and to ignore rare species. The lack of singletons is not a useful flag in this case.
+
+The almost complete lack of singletons in some species rich data sets is curious and warants a flag.
+
+```{r, include = FALSE}
+  noSingletons_dataset %>% 
+  filter(ntaxon > 40, prop > 0.1) %>% 
+  arrange(prop)
+```
+
+## Expectation 4: Samples that lack singletons should not have lowest common denomintor > 1
+
+It was the many assemblages without singletons were the counts were [integer multiples](https://quantpalaeo.wordpress.com/2016/04/25/curious-chironomid-counts/) of the rarest taxon, that first alerted me to the problems with the chironomid data from Lake Żabińskie. Such counts should be very rare, but will occur if the counts have been multiplied.
+
+I want to flag samples without singletons where all/most of the counts are integer multiples of the rarest taxon. 
+
+```{r}
+integer_mult <- allPollen %>% 
+  inner_join(allCountSums %>% filter(richness > 5, minCount > 1)) %>% 
+  group_by(.id, sampleID) %>% 
+  summarise(prop = mean(count %% minCount == 0)) %>% 
+  left_join(allCountSums) %>% 
+  select(-singletons)  
+  
+  integer_mult %>% 
+  mutate(minCount2 = cut(minCount, breaks = c(0, 2, 3, 4, 5, 10, Inf), labels = c(2, 3, 4, 5, "< 10", "> 10"))) %>% 
+  ggplot(aes(x = prop, fill = minCount2)) +
+  geom_histogram() +
+  labs(x = "Proportion of count integer multiple of minimum count", y = "Frequency", fill = "Minimum count")
+```
+
+Of the `r nrow(integer_mult)` samples without singletons (and taxonomic richness > 5), `r sum(integer_mult$prop == 1)` have all count integer multiples of the rarest taxon. In one sample, all counts are multiples of `r integer_mult %>% filter(prop == 1) %>% ungroup() %>% summarise(max = max(minCount))`. 
+
+In one data set, `r allPollen %>% filter(.id == 1776) %>% summarise(m = mean(count %% 3 == 0)) %>% pc`% of values are multiples of 3, the minimum count of all samples.
+
+I have no hesitation in suggesting that in neither of these examples the data are not raw counts. Possible scenarios include the data being 1) accumulation rates or concentrations, 2) per mille, 3) backtransformed from percent after rounding, 4) the result of someone pulling a fast one. 
+
+## Expectation 5. Zeros. Lots of them.
+
+Community data usually have a many zero values and few samples will contain all the taxa found in the whole data set (unless there are few few samples), especially if the richness is high. 
+
+```{r }
+# noZeros <- allCountSums %>% 
+#   mutate(n = n()) %>% 
+#   filter(n > 2, richness == ntaxon, richness > 25)  %>% pn
+# 
+# ggplot(allCountSums, aes(x = ntaxon, y = richness)) + 
+#   geom_abline(intercept = 0, slope = 1) +
+#   geom_point(alpha = 0.2) + 
+#   geom_smooth() +
+#   labs(x = "Number of taxa in data set", y = "Taxonomic richness")
+
+zeros <- plyr::ldply(allPollenCounts, function(x){
+  data_frame(zeros = mean(x == 0), nsamp = nrow(x), ntaxa = ncol(x))
+  }, 
+  .parallel = TRUE)
+#zeros %>% filter(nsamp > 1) %>%  arrange(zeros) 
+
+zeros %>% filter(nsamp > 10) %>%
+  mutate(ntaxa = cut(ntaxa, breaks = c(0, 25, 40, Inf), labels = c("<= 25 ", "<= 40", "> 40"))) %>% 
+  ggplot(aes(x = zeros * 100, fill = ntaxa)) + 
+  geom_histogram() +
+  labs(x = "Percent zeros", fill = "N taxa", title = "Percent zeros in each data set")
+
+#zeros %>% filter(.id == 4082)
+```
+
+Data set 4082 has `r zeros %>% filter(.id == 4082) %>% select(ntaxa)` taxa and `r zeros %>% filter(.id == 4082) %>% select(nsamp)` samples but only `r zeros %>% filter(.id == 4082) %>% select(zeros) %>% pc`% of the counts are zero. Flagged as curious.
+
+## Other testable expectations?
+
+Suggestions for other tests that could reveal errors or other problems in putative count data would be very welcome. I'm hoping that, in collaboration with Simon Goring, some of these tests can be implemented in Neotoma and that the clearly erroneous data sets can be cleaned. 
+
+
+
+
+```{r eval = FALSE}
+## Expectation 5: The distribution of the frequency of counts in a data-set should be smooth
+
+#It would be a curious data set that had many counts of seven but none of eight. 
+
+
+nCounts <- allPollen %>%
+  group_by(.id) %>% 
+  filter(n() > 50) %>% #remove small datasets
+  filter(count <= 15) %>% 
+  mutate(count = as.factor(count)) %>% 
+  count(count) %>% 
+  spread(key = count, value = n, fill = 0) %>% 
+  semi_join(noSingletons_dataset %>% filter(ntaxon > 25, prop < 0.1))
+
+nCounts %>% ungroup() %>% 
+  filter(`2` < `1`) %>% 
+  slice(1:20) %>% 
+  gather(key = count, value = n, -.id) %>% 
+  mutate(count = as.numeric(count)) %>% 
+  ggplot(aes(x = count, y = n)) + 
+    geom_col() +
+    facet_wrap(~.id, scales = "free_y")
+
+nCounts %>% ungroup() %>% 
+  filter(`3` >  `1`) %>% 
+  gather(key = count, value = n, -.id) %>% 
+  mutate(count = as.numeric(count)) %>% 
+  ggplot(aes(x = count, y = n)) + 
+    geom_col(width = 1) +
+    facet_wrap(~.id, scales = "free_y")
+
+allPollen %>% mutate(f = count %% 2 ==0) %>% group_by(.id) %>% summarise(f = mean(f), n = n()) %>% arrange(desc(f))
+allPollen %>% mutate(f = count %% 3 ==0) %>% group_by(.id) %>% summarise(f = mean(f), n = n()) %>% arrange(desc(f))
+allPollen %>% mutate(f = count %% 5 ==0) %>% group_by(.id) %>% summarise(f = mean(f), n = n()) %>% arrange(desc(f))
+allPollen %>% mutate(f = count %% 10 ==0) %>% group_by(.id) %>% summarise(f = mean(f), n = n()) %>% arrange(desc(f))
+```
+
+
 
 
 
