@@ -22,6 +22,11 @@ pc <- function(x, digits = 0) round(x * 100, digits = digits)
 
 #register parallel backend
 doMC::registerDoMC(cores = 3)
+
+knitr::read_chunk("download_all_pollen_data.R")
+```
+
+```{r download}
 ```
 
 ```{r}
@@ -63,8 +68,9 @@ I started to tinker with the neotoma R package and downloaded some fossil pollen
 
 ```{r map, fig.height=4, fig.width=9, fig.cap="Location of Neotoma fossil pollen data."}
 mp <- map_data("world")
-plyr::ldply(allPollenData, function(x)x$dataset$site.data) %>% 
-  ggplot(aes(x = long, y = lat)) + 
+locations <- plyr::ldply(allPollenData, function(x)x$dataset$site.data) 
+
+worldMap <- ggplot(locations, aes(x = long, y = lat)) + 
  geom_map(data = mp, map = mp, mapping = aes(map_id = region), fill = "grey80") +
   scale_x_continuous(expand = c(0,0)) +
   scale_y_continuous(limits = c(-70, NA), expand = c(0,0)) +
@@ -72,7 +78,7 @@ plyr::ldply(allPollenData, function(x)x$dataset$site.data) %>%
   coord_quickmap() +
   labs(x = "Longitude E°", y = "Latiude N°")
 
-rm(mp)#clean up
+worldMap
 ```
 
 But what to do with 170 MB of data?
@@ -447,8 +453,6 @@ allPollen %>% mutate(f = count %% 3 ==0) %>% group_by(.id) %>% summarise(f = mea
 allPollen %>% mutate(f = count %% 5 ==0) %>% group_by(.id) %>% summarise(f = mean(f), n = n()) %>% arrange(desc(f))
 allPollen %>% mutate(f = count %% 10 ==0) %>% group_by(.id) %>% summarise(f = mean(f), n = n()) %>% arrange(desc(f))
 ```
-
-
 
 
 
