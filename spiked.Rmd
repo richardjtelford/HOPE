@@ -1,0 +1,59 @@
+---
+title: "Spiked"
+author: "Richard J. Telford"
+date: "July 26, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r eucalyptusMap}
+australia <- neotoma:::gp.table %>% filter(GeoPoliticalName == "Australia")
+Australian_sites <- get_site(gpid = australia$GeoPoliticalID)
+
+euca <- locations %>% 
+  inner_join(allPollen %>% filter(grepl("Eucal", species))) %>%
+  mutate(aus = site.id  %in% Australian_sites$site.id)
+
+worldMap %+% euca + geom_point(aes(colour = aus)) + facet_wrap(~species)
+
+eucaX <- locations %>% 
+  filter(!site.id  %in% Australian_sites$site.id) %>% 
+  inner_join(allPollen %>% filter(grepl("Eucal", species)))
+eucaX
+eu_spike <- eucaX %>% group_by(.id, lat, long) %>% 
+  summarise(n = n(), min = min(count), max = max(count)) %>% 
+  left_join(zeros %>% select(-zeros, -ntaxa)) %>% ungroup() %>% 
+  mutate(spike = case_when(.$n == .$nsamp & .$max > 10 ~ "yes",
+                           .$n < .$nsamp / 2 & .$max < 10 ~ "no",
+                           TRUE ~ "?"))
+
+worldMap %+% eu_spike + geom_point(aes(colour = spike))
+
+#chronology
+```
+```{r lycopodiumMap}
+
+lyco <- locations %>% inner_join(allPollen %>% filter(grepl("Lycopodium", species))) %>% select(-description, -site.name, -long.acc, -lat.acc, -elev)
+
+worldMap %+% (lyco %>% mutate(species = gsub("-type", "", species)))  + facet_wrap(~species)
+
+lyco %>% arrange(desc(count)) %>% select(.id, sampleID, species, count)
+quantile(lyco$count, prob = c(0.9, 0.95, .99))
+
+lyco %>% filter(count < 400) %>% ggplot(aes(x = count)) + geom_histogram()
+
+lyco_spike <- lyco %>% group_by(.id, lat, long) %>% 
+  summarise(n = n(), n10 = sum(count > 10), min = min(count), max = max(count)) %>% 
+  left_join(zeros %>% select(-zeros, -ntaxa)) %>% ungroup() %>% 
+  mutate(spike = case_when(.$n == .$nsamp & .$max > 50 ~ "yes",
+                           .$max < 20 ~ "no",
+                           TRUE ~ "?"))
+
+worldMap %+% lyco_spike + geom_point(aes(colour = spike))
+
+#chronology
+```
