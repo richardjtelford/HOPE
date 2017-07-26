@@ -11,6 +11,7 @@
 *.pdf
 *.doc
 *.html
+*.md
 
 #binary imput files
 *.xls
