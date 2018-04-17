@@ -1,0 +1,80 @@
+---
+title: "Untitled"
+author: "Richard J. Telford"
+date: "April 17, 2018"
+geometry: margin=2cm
+output: 
+  pdf_document
+documentclass: article
+classoption: a4paper
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, cache.lazy = TRUE)
+```
+
+```{r load_packages, cache=FALSE}
+library("tidyverse")
+library("neotoma")
+library("analogue")
+
+source("make_stratplot.R")
+```
+
+```{r load_data}
+mp <- map_data("world") 
+detach("package:maps")
+
+load("european.Rdata")
+load("sites_meta.Rdata")
+```
+
+## Basic maps
+
+```{r site_map}
+g <- sites_meta %>% 
+ggplot(aes(x = long, y = lat, colour = length)) +
+  geom_map(data = mp, map = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey80") +
+  geom_rect(data = europe$loc %>% 
+    as.list() %>% 
+    as.data.frame(), 
+    mapping = aes(xmin = lonW, xmax = lonE, ymin = latS, ymax = latN), colour = "red", fill = NA, inherit.aes = FALSE) +
+  geom_point() +
+  coord_quickmap() +
+  scale_y_continuous(expand = c(0.01, 0))
+
+g
+```
+
+
+```{r depo_map}
+g %+% (sites_meta %>% filter(length == "Most Holocene")) +
+         aes(colour = DepEnvt.4)
+```
+
+## Pollen diagrams
+
+```{r subset}
+european_data <- european_data[sites_meta$length == "Most Holocene"]
+sites_meta <- sites_meta %>% 
+  filter(length == "Most Holocene")
+```
+
+
+```{r plot_figure,results = 'asis', out.extra="angle=90", out.width = "600px", out.height="500px", cache = FALSE}
+for(i in sites_meta$dataset.id[1:5]) {
+  x <- sites_meta %>% filter(dataset.id == i) %>% 
+    select(site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
+  cat("\\pagebreak")
+  cat("\n\n##", x$site.name, "\n")
+  knitr::kable(x %>% select(-description), digits = 2) %>% paste(collapse = "\n") %>% cat()
+  cat("\n")
+  cat("\n")
+  cat(x$description)
+  cat("\n")
+  
+  make_stratplot(european_data[[as.character(i)]], yaxis = "age", y.rev = TRUE, method = "percent", group = wanted, exag = TRUE, exag.mult  = 10, plot.poly = TRUE, scale.percent = TRUE, col.poly = "grey40", srt.xlabel = 50, cex.xlabel = .6, yTop  = 0.75, cex.ylabel=.7, cex.yaxis=0.6, cex.axis=.6, xRight = .95)
+  
+  cat("\\pagebreak")
+  }
+```
