@@ -2,58 +2,219 @@
 title: "Spiked"
 author: "Richard J. Telford"
 date: "July 26, 2017"
-output: html_document
+output: 
+  html_document:
+    self_contained: no
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, autodep = TRUE, message = FALSE, warning = FALSE)
+
+#load packages
+library("tidyverse")
+library("neotoma")
+library("english")
+as.English <- function(x){
+  gsub("([[:alpha:]])(.+)", "\\U\\1\\L\\2", as.english(x), perl = TRUE)
+}
+pc <- function(x, digits = 0) round(x * 100, digits = digits)
+
+#register parallel backend
+doMC::registerDoMC(cores = 3)
+
+knitr::read_chunk("download_all_pollen_data.R")
+```
+
+Relative pollen abundance data can be difficult to interpret. If percent _Pinus_ increases, it could be because pine trees became more common, or because other species became rarer. Pollen concentration (or ideally influx rates) can help resolve what is happening.
+
+I'm still exploring the neotoma database and associated R package, and decided to look at how, and how often, pollen concentrations have been calculated (code for all this is on [github](https://github.com/richardjtelford/HOPE) if you want to see how I did it, and tell me how I can do it better).
+
+```{r download}
+```
+
+```{r loadData}
+load("allPollenData.RData")
+```
+```{r allPollen, results='hide'}
 ```
 
 
-```{r eucalyptusMap}
+```{r identifySpike}
+##identify spike
+#taxonomy
+combinedtaxonomy <- map_df(allPollenData, function(x) x$taxon.list) %>% distinct() %>% as_tibble()
+
+spike_variables <- combinedtaxonomy %>% 
+  filter(!variable.units %in% c("NISP", "present/absent", "NISP digitized", "cm", "cm^2", "µm"),
+         !variable.element %in% c("stomate", "pollen", "spore", "pollen/spore", "fragment"),
+         !taxon.name %in% c("Sample quantity")
+         ) %>%
+  distinct(taxon.name, variable.units, variable.element) %>% 
+  arrange(variable.units)
+
+```
+
+```{r getSpike}
+spikes <- plyr::ldply(allPollenData, function(x){
+    tax <- x$taxon.list %>% 
+      semi_join(spike_variables) %>% 
+      select(-variable.context, -taxon.group, -ecological.group) %>% 
+      select(-matches("alias"))
+  }, 
+  .parallel = TRUE
+)
+
+locations <- plyr::ldply(allPollenData, function(x)x$dataset$site.data) 
+
+
+spikes2 <- spikes %>% 
+  mutate(spike = taxon.name) %>% 
+  mutate(spike = gsub(" spike", "", spike),
+         spike = gsub(" suspension", "", spike),
+         spike = gsub(" tablets", "", spike),
+         spike = gsub("Microsphere$", "Microspheres", spike),
+         spike = gsub("Trilete fern-spore", "Fern-spore", spike),
+         spike = if_else(variable.element == "Jorgensen method", "Jørgensen method", spike)
+         ) %>% 
+  select(-variable.units, -variable.element, -taxon.name) %>% 
+  group_by(.id) %>% 
+  distinct(spike, .keep_all = TRUE) %>% 
+  filter(!spike == "Pollen concentration", #always redundant
+         !(spike == "Spike" & n() > 1) #remove redundant Spike
+  ) %>% 
+  full_join(locations) %>% 
+  mutate(spike  = if_else(is.na(spike), "None", spike), 
+         spike = if_else(spike == "Spike", "Unknown spike", spike),
+         spike = factor(spike, levels = c("Eucalyptus", "Fagus", "Fern-spore", "Lycopodium", "Kochia", "Microspheres", "Unknown spike", "Jørgensen method", "None")))
+```
+
+There are two basic methods for estimating pollen concentrations. The first is to count all the pollen in a carefully weighed amount of pollen (known in Neotoma as the [Jørgensen method](http://onlinelibrary.wiley.com/doi/10.1111/j.1469-8137.1967.tb06028.x/full)). The second is to add a spike of exotic pollen/spores/plastic microspheres and [calculate the concentration](http://onlinelibrary.wiley.com/doi/10.1111/j.1469-8137.1972.tb04086.x/full) from the pollen:spike ratio. This spike method is by far the most popular method of calculating concentration in the Neotoma database, with a variety of exotics used. 
+
+```{r spikedTable}
+spikes2 %>% 
+  ungroup %>% 
+  count(spike) %>% 
+  arrange(spike) %>% 
+  rename(Spike = spike) %>% 
+  mutate(Percent = round(n / nrow(locations) * 100, 1)) %>% 
+  select(-n) %>% 
+  knitr::kable(caption = "Percent do not sum to 100% as a few data sets use more than one method.")
+```
+
+There is some geographic patterns in the method used. _Eucalyptus_ is, not surprisingly, not used in Australia, and the Jørgensen method is inexplicably popular in eastern Canada. 
+
+```{r spikeMap}
+mp <- map_data("world")
+
+worldMap <- ggplot(locations, aes(x = long, y = lat)) + 
+ geom_map(data = mp, map = mp, mapping = aes(map_id = region), fill = "grey80") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(limits = c(-70, NA), expand = c(0,0)) +
+  coord_quickmap() +
+  labs(x = "Longitude E°", y = "Latiude N°")
+
+worldMap %+% spikes2 +
+    geom_point(alpha = 0.4) + 
+    facet_wrap(~spike)
+
+```
+
+
+
+
+```{r, eval = FALSE}
+ spikes %>% filter(grepl("Kochia", taxon.name)) %>% distinct(.id)
+ spikes %>% filter(grepl("Fern", taxon.name)) %>% distinct(.id)
+ spikes %>% filter(grepl("Fagus", taxon.name)) %>% distinct(.id)
+
+```
+
+In my [previous post](https://quantpalaeo.wordpress.com/2017/07/22/all-the-pollen/) on Neotoma, I noted that the very high concentrations of _Eucalyptus_ in Hockham Mere suggested that the exotic spike had been mislabelled as a tree/shrub. I want to know if this is the only site with this problem.
+
+Several _Eucalyptus_ morphotaxa are found in Neotoma, but all except plain _Eucalyptus_ are only found in Australia.
+```{r chronology}
+chron <- map_df(allPollenData, function(x)ages(x)) %>% 
+  rename(.id = dataset.id, sampleID = sample.id) %>% 
+  mutate(.id = as.character(.id), sampleID = as.character(sampleID))
+
+```
+
+```{r eucalyptusData}
 australia <- neotoma:::gp.table %>% filter(GeoPoliticalName == "Australia")
 Australian_sites <- get_site(gpid = australia$GeoPoliticalID)
-
 euca <- locations %>% 
   inner_join(allPollen %>% filter(grepl("Eucal", species))) %>%
   mutate(aus = site.id  %in% Australian_sites$site.id)
+```
 
-worldMap %+% euca + geom_point(aes(colour = aus)) + facet_wrap(~species)
+```{r eucalptusMap}
+worldMap %+% (euca %>% mutate(species = if_else(species == "Eucalyptus", "Eucalyptus", "Various types"))) + 
+  geom_point() + 
+  facet_wrap(~species)
+```
 
-eucaX <- locations %>% 
+
+
+```{r eucaSpike}
+nsamples <- plyr::ldply(allPollenCounts, function(x){
+    data_frame(nsamp = nrow(x))
+  }, 
+  .parallel = TRUE)
+
+eucaX <- locations %>% select(-description) %>% 
   filter(!site.id  %in% Australian_sites$site.id) %>% 
   inner_join(allPollen %>% filter(grepl("Eucal", species)))
-eucaX
+
 eu_spike <- eucaX %>% group_by(.id, lat, long) %>% 
   summarise(n = n(), min = min(count), max = max(count)) %>% 
-  left_join(zeros %>% select(-zeros, -ntaxa)) %>% ungroup() %>% 
+  left_join(nsamples) %>% 
+  ungroup() %>% 
+  mutate(spike = case_when(.$min > 10 ~ "Probably",
+                           .$max < 10 ~ "No",
+                           TRUE ~ "?"))
+```
+
+Assuming that no palynologists working on Australian material would use _Eucalyptus_ as a spike, we only need to consider the `r nrow(eu_spike)` non-Australian data-sets. Of these, many have just a few _Eucalyptus_ grains, and these are mostly from recent sediments and so are perhaps from introduced _Eucalyptus_ trees growing near to the studied site. About ten records have, judging by the abundance of _Eucalyptus_ pollen, mislabelled spikes. In some cases, for example the [Lake of the Clouds](http://apps.neotomadb.org/Explorer/?datasetid=1649), most levels have microsphere markers, the others have many _Eucalyptus_ grains. 
+
+```{r eucalyptusSpikeMap}
+worldMap %+% eu_spike + geom_point(aes(colour = spike)) + labs(colour = "Spike")
+```
+
+```{r checkAge, include = FALSE}
+eucaX %>% left_join(chron) %>% 
+  group_by(.id, lat, long) %>% 
+  summarise(n = n(), min = min(count), max = max(count), min.age = min(age, na.rm = TRUE), max.age = max(age, na.rm = TRUE), age.type = first(age.type), panic = n_distinct(chronology.id)) %>% 
+  left_join(nsamples) %>%
+  ungroup() %>% 
   mutate(spike = case_when(.$n == .$nsamp & .$max > 10 ~ "yes",
                            .$n < .$nsamp / 2 & .$max < 10 ~ "no",
-                           TRUE ~ "?"))
+                           TRUE ~ "?")) %>% 
+  arrange(spike)
 
-worldMap %+% eu_spike + geom_point(aes(colour = spike))
 
-#chronology
 ```
-```{r lycopodiumMap}
 
-lyco <- locations %>% inner_join(allPollen %>% filter(grepl("Lycopodium", species))) %>% select(-description, -site.name, -long.acc, -lat.acc, -elev)
+```{r lyco}
+lyco <- locations %>% 
+  inner_join(allPollen %>% filter(grepl("Lycopodium", species))) %>% 
+  select(-description, -site.name, -long.acc, -lat.acc, -elev) %>% 
+  mutate(simple_species = gsub("Lycopodiaceae cf. |cf. L. |-type|cf. | \\(tetrad)", "", species))
 
-worldMap %+% (lyco %>% mutate(species = gsub("-type", "", species)))  + facet_wrap(~species)
+lyco_thresh <- 50
 
-lyco %>% arrange(desc(count)) %>% select(.id, sampleID, species, count)
-quantile(lyco$count, prob = c(0.9, 0.95, .99))
-
-lyco %>% filter(count < 400) %>% ggplot(aes(x = count)) + geom_histogram()
-
-lyco_spike <- lyco %>% group_by(.id, lat, long) %>% 
-  summarise(n = n(), n10 = sum(count > 10), min = min(count), max = max(count)) %>% 
-  left_join(zeros %>% select(-zeros, -ntaxa)) %>% ungroup() %>% 
-  mutate(spike = case_when(.$n == .$nsamp & .$max > 50 ~ "yes",
+lyco_spike <- lyco %>% group_by(.id, lat, long, species) %>% 
+  summarise(n = n(), min = min(count), max = max(count)) %>% 
+  left_join(nsamples) %>% 
+  ungroup() %>% 
+  mutate(spike = case_when(.$n == .$nsamp & .$max > lyco_thresh ~ "Probably",
                            .$max < 20 ~ "no",
                            TRUE ~ "?"))
-
-worldMap %+% lyco_spike + geom_point(aes(colour = spike))
-
-#chronology
 ```
+_Lycopodium_ (clubmoss) is the other taxon commonly used as a spike. Given its [worldwide distribution](http://www.gbif.org/species/2688247), it is going to be more difficult to identify rogue spikes. `r lyco %>% summarise(n = n_distinct(simple_species)) %>% as.numeric %>% as.English` _Lycopodium_ taxa/morphotaxa are found in `r lyco %>% summarise(n = n_distinct(.id))` data sets. The vast majority (`r mean(lyco_spike$max < lyco_thresh) %>% pc`%) of these data sets have a maximum abundance of fewer than `r lyco_thresh` spores and so are unlikely to be spikes. Of the remainder, some are almost certainly spikes (e.g. 4296, 4355), others are difficult to tell without going back to be original literature.
+
+```{r lycopodiumMap, fig.cap="Combined _Lycopodium_ distribution", fig.keep = FALSE}
+worldMap %+% (lyco %>% distinct(.id, .keep_all = TRUE)) +
+  geom_point()
+```
+
+In Neotoma, as with any big data set, there are inevitably errors in a small proportion of the data. It is users responsibility to check that any errors are not having a large influence of their results and to report any errors so that the database is gradually improved.
