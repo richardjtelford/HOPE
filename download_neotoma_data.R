@@ -5,20 +5,27 @@ library("neotoma")
 #register parallel backend
 doMC::registerDoMC(cores = 3)
 
-##
+## get map
+mp <- map_data("world")
+detach("package:maps")
+
+## region of interest
 europe <- list(
   datasettype = "pollen",
   loc = c(lonW = -20, latS = 30, lonE = 45, latN = 89)
   
 )
 
-sites <- europe %>% do.call(what = get_dataset, args = .)
+#get dataset list
+sites <- europe %>% 
+  do.call(what = get_dataset, args = .)
 
+#extract site information
 sites_meta <- sites %>% 
-  purrr::map("site.data") %>% 
-  purrr::map_df(as_data_frame)
+  map("site.data") %>% 
+  map_df(as_data_frame)
 
-mp <- map_data("world")
+#map sites
 europe$loc %>% 
   as.list() %>% 
   as.data.frame() %>% 
