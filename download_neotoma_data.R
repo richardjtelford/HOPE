@@ -35,8 +35,15 @@ european_data <- sites %>% get_download()
 DepEnvtTypes <- get_table("DepEnvtTypes")
 CollectionUnits <- get_table("CollectionUnits")
 
+##
+ecol_groups <- get_table("EcolGroupTypes")
+ecol_groups <- ecol_groups  %>% 
+  select(-starts_with("RecDate"))
+
+wanted <- c("TRSH", "UPHE", "VACR", "SUCC", "PALM", "MANG")
+
 ## save downloaded data
-save(sites, european_data, DepEnvtTypes, CollectionUnits, file = "european.Rdata")
+save(europe, sites, european_data, DepEnvtTypes, CollectionUnits, wanted, ecol_groups, file = "european.Rdata")
 
 
 age_control <- european_data %>% 
