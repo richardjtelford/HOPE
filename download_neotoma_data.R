@@ -94,8 +94,4 @@ sites_meta <- sites_meta %>%
 g %+% (sites_meta %>% filter(length == "Most Holocene")) +
          aes(colour = DepEnvt.4)
 
-# x <- get_download(sites[[1]])
-# ages(x)
-# x %>% neotoma:::Stratiplot.download(yaxis = "depth")
-# 
-# x
+save(sites_meta, file = "sites_meta.Rdata")
