@@ -46,11 +46,20 @@ ggplot(aes(x = long, y = lat, colour = length)) +
 g
 ```
 
+###Issues
+
+- Several sites lack chronologies
+- Many sites are on uncalibrated radiocarbon age-models 
 
 ```{r depo_map}
 g %+% (sites_meta %>% filter(length == "Most Holocene")) +
          aes(colour = DepEnvt.4)
 ```
+ 
+This is coarsest classification of depositional environments. 
+
+Forest hollows are not a distinct depositional environment type.
+
 
 ## Pollen diagrams
 
@@ -66,7 +75,7 @@ for(i in sites_meta$dataset.id[1:5]) {
   x <- sites_meta %>% filter(dataset.id == i) %>% 
     select(site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
   cat("\\pagebreak")
-  cat("\n\n##", x$site.name, "\n")
+  cat("##", x$site.name, "\n")
   knitr::kable(x %>% select(-description), digits = 2) %>% paste(collapse = "\n") %>% cat()
   cat("\n")
   cat("\n")
