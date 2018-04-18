@@ -2,44 +2,26 @@
 library("tidyverse")
 library("neotoma")
 
-## region of interest
-europe <- list(
-  datasettype = "pollen",
-  loc = c(lonW = 4, latS = 55, lonE = 37, latN = 81)
-)
-
 #get dataset list
-sites <- europe %>% 
-  do.call(what = get_dataset, args = .)
+pollen_sites <- get_dataset(datasettype = "pollen")
 
 #extract site information
-sites_meta <- sites %>% 
+sites_meta <- pollen_sites %>% 
   map("site.data") %>% 
   map_df(as_data_frame) %>% 
-  bind_cols(sites %>% 
+  bind_cols(pollen_sites %>% 
               map_df("dataset.meta"))
 
-
-
 #download_data
-european_data <- sites %>% get_download()
+pollen_data <- pollen_sites %>% get_download()
 
 ### download environment
 DepEnvtTypes <- get_table("DepEnvtTypes")
 CollectionUnits <- get_table("CollectionUnits")
 
-##
-ecol_groups <- get_table("EcolGroupTypes")
-ecol_groups <- ecol_groups  %>% 
-  select(-starts_with("RecDate"))
 
-wanted <- c("TRSH", "UPHE", "VACR", "SUCC", "PALM", "MANG")
-
-## save downloaded data
-save(europe, sites, european_data, DepEnvtTypes, CollectionUnits, wanted, ecol_groups, file = "european.Rdata")
-
-
-age_control <- european_data %>% 
+##age control
+age_control <- pollen_data %>% 
   map(ages) %>% 
   map_df(function(x){
     x %>% summarise(age_min = min(age), age_max = max(age), n = n(), res = n/(age_max - age_min) * 1000)
@@ -48,14 +30,16 @@ age_control <- european_data %>%
   mutate(dataset.id = as.numeric(dataset.id)) %>% 
   as_tibble()
 
-age_control <- age_control %>% mutate(length = case_when(
-  is.na(age_min) ~ "none?",
-  age_max - age_min < 4000 ~ "short",
-  age_min < 2000 & age_max > 8000 ~ "Most Holocene",
-  age_min > 8000 ~ "Late Glacial",
-  TRUE ~"part Holocene"
-))
+age_control <- age_control %>% 
+  mutate(length = case_when(
+    is.na(age_min) ~ "none?",
+    age_max - age_min < 4000 ~ "short",
+    age_min < 2000 & age_max > 8000 ~ "Most Holocene",
+    age_min > 8000 ~ "Late Glacial",
+    TRUE ~"part Holocene"
+  ))
   
+# join age_control to sites_meta
 sites_meta <- sites_meta %>% inner_join(age_control)
 
 
@@ -78,4 +62,12 @@ CollectionUnits <- CollectionUnits %>%
 sites_meta <- sites_meta %>% 
   left_join(CollectionUnits, by = c("collection.handle" = "Handle"))
 
-save(sites_meta, file = "sites_meta.Rdata")
+## ecological_groups
+ecol_groups <- get_table("EcolGroupTypes")
+ecol_groups <- ecol_groups  %>% 
+  select(-starts_with("RecDate"))
+
+wanted <- c("TRSH", "UPHE", "VACR", "SUCC", "PALM", "MANG")
+
+## save downloaded data
+save(sites_meta, pollen_sites, pollen_data, DepEnvtTypes, CollectionUnits, wanted, ecol_groups, file = "pollen.Rdata")
