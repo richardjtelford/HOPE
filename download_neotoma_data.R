@@ -2,13 +2,6 @@
 library("tidyverse")
 library("neotoma")
 
-#register parallel backend
-doMC::registerDoMC(cores = 3)
-
-## get map
-mp <- map_data("world")
-detach("package:maps")
-
 ## region of interest
 europe <- list(
   datasettype = "pollen",
@@ -65,19 +58,6 @@ age_control <- age_control %>% mutate(length = case_when(
   
 sites_meta <- sites_meta %>% inner_join(age_control)
 
-#map sites
-g <- sites_meta %>% 
-ggplot(aes(x = long, y = lat, colour = length)) +
-  geom_map(data = mp, map = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey80") +
-  geom_rect(data = europe$loc %>% 
-    as.list() %>% 
-    as.data.frame(), 
-    mapping = aes(xmin = lonW, xmax = lonE, ymin = latS, ymax = latN), colour = "red", fill = NA, inherit.aes = FALSE) +
-  geom_point() +
-  coord_quickmap() +
-  scale_y_continuous(expand = c(0.01, 0))
-
-g
 
 ## get environment data
 DepEnvtTypes <- DepEnvtTypes %>% 
@@ -97,8 +77,5 @@ CollectionUnits <- CollectionUnits %>%
 ## merge depo environement with  site_meta
 sites_meta <- sites_meta %>% 
   left_join(CollectionUnits, by = c("collection.handle" = "Handle"))
-
-g %+% (sites_meta %>% filter(length == "Most Holocene")) +
-         aes(colour = DepEnvt.4)
 
 save(sites_meta, file = "sites_meta.Rdata")
