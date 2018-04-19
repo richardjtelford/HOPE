@@ -13,7 +13,7 @@ sites_meta <- pollen_sites %>%
               map_df("dataset.meta"))
 
 #download_data
-pollen_data <- pollen_sites %>% get_download()
+pollen_data <- pollen_sites %>% get_download() #SLOW
 
 ### download environment
 DepEnvtTypes <- get_table("DepEnvtTypes")
@@ -24,7 +24,12 @@ CollectionUnits <- get_table("CollectionUnits")
 age_control <- pollen_data %>% 
   map(ages) %>% 
   map_df(function(x){
-    x %>% summarise(age_min = min(age), age_max = max(age), n = n(), res = n/(age_max - age_min) * 1000)
+    x %>% 
+      summarise(
+        age_min = min(age, na.rm  = TRUE), 
+        age_max = max(age, na.rm = TRUE), 
+        n = n(), 
+        res = n/(age_max - age_min) * 1000)
     },
     .id = "dataset.id") %>% 
   mutate(dataset.id = as.numeric(dataset.id)) %>% 
@@ -32,7 +37,7 @@ age_control <- pollen_data %>%
 
 age_control <- age_control %>% 
   mutate(length = case_when(
-    is.na(age_min) ~ "none?",
+    is.na(age_min) | is.infinite(age_min) ~ "none?",
     age_max - age_min < 4000 ~ "short",
     age_min < 2000 & age_max > 8000 ~ "Most Holocene",
     age_min > 8000 ~ "Late Glacial",
