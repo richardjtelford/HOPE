@@ -75,4 +75,4 @@ ecol_groups <- ecol_groups  %>%
 wanted <- c("TRSH", "UPHE", "VACR", "SUCC", "PALM", "MANG")
 
 ## save downloaded data
-save(sites_meta, pollen_sites, pollen_data, DepEnvtTypes, CollectionUnits, wanted, ecol_groups, file = "pollen.Rdata")
+save(sites_meta, pollen_sites, pollen_data, DepEnvtTypes, CollectionUnits, wanted, ecol_groups, file = "data/pollen.Rdata")

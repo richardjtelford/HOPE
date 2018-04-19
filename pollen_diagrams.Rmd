@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 ```{r load_packages, cache=FALSE}
 library("tidyverse")
 
-source("make_stratplot.R")
+source("R/make_stratplot.R")
 ```
 
 ```{r load_data, warning = FALSE}
@@ -28,7 +28,7 @@ detach("package:maps")
 
 region <- params$region
 
-load("pollen.Rdata") 
+load("data/pollen.Rdata") 
 
 sites_meta <- sites_meta %>% 
   filter(long >= region$lonW,
@@ -75,13 +75,12 @@ sites_meta <- sites_meta %>%
   filter(length == "Most Holocene")
 ```
 
-\\pagebreak
 
 ```{r plot_figure, results = 'asis', out.extra="angle=90", out.width = "600px", out.height="500px", cache = FALSE}
 for(i in sites_meta$dataset.id[1:5]) {
   x <- sites_meta %>% filter(dataset.id == i) %>% 
     select(site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
-  cat("\n##", x$site.name, "\n\n")
+  cat("\n\n##", x$site.name, "\n\n")
   knitr::kable(x %>% select(-description), digits = 2) %>% paste(collapse = "\n") %>% cat()
   cat("\n\n")
   cat(x$description)
