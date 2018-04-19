@@ -3,10 +3,11 @@ library("tidyverse")
 library("neotoma")
 
 #render wrapper
-produce_regional_pollen_diagrams <- function(region){
+produce_regional_pollen_diagrams <- function(region, ...){
   rmarkdown::render(
     input = "pollen_diagrams.Rmd", 
-    params = list(region = region, region_name = region_name)
+    params = list(region = region), 
+    ...
   )
 }
 
