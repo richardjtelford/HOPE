@@ -1,5 +1,5 @@
 ---
-title: `r paste("Pollen diagrams for", params$region$region_name)`
+title: '`r paste("Pollen diagrams for", params$region$name)`'
 author: "Richard J. Telford"
 date: "April 17, 2018"
 geometry: margin=2cm
@@ -8,29 +8,27 @@ output:
 documentclass: article
 classoption: a4paper
 params:
-  region
+  region: !r data_frame(name = "Global", lonW = -180.1, latS = 90, lonE = 180.1, latN = 90)
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, cache.lazy = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 ```
 
 
 ```{r load_packages, cache=FALSE}
 library("tidyverse")
-library("neotoma")
-library("analogue")
 
 source("make_stratplot.R")
 ```
 
-```{r load_data}
-mp <- map_data("world") 
+```{r load_data, warning = FALSE}
+mp <- map_data("world")
 detach("package:maps")
 
 region <- params$region
 
-load("pollen.Rdata")
+load("pollen.Rdata") 
 
 sites_meta <- sites_meta %>% 
   filter(long >= region$lonW,
@@ -49,7 +47,8 @@ ggplot(aes(x = long, y = lat, colour = length)) +
     mapping = aes(xmin = lonW, xmax = lonE, ymin = latS, ymax = latN), colour = "red", fill = NA, inherit.aes = FALSE) +
   geom_point() +
   coord_quickmap() +
-  scale_y_continuous(expand = c(0.01, 0))
+  scale_y_continuous(expand = c(0.01, 0)) + 
+  scale_x_continuous(expand = c(0.01, 0)) 
 
 g
 ```
@@ -76,16 +75,15 @@ sites_meta <- sites_meta %>%
   filter(length == "Most Holocene")
 ```
 
+\\pagebreak
 
 ```{r plot_figure, results = 'asis', out.extra="angle=90", out.width = "600px", out.height="500px", cache = FALSE}
 for(i in sites_meta$dataset.id[1:5]) {
   x <- sites_meta %>% filter(dataset.id == i) %>% 
     select(site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
-  cat("\\pagebreak")
-  cat("##", x$site.name, "\n")
+  cat("\n##", x$site.name, "\n\n")
   knitr::kable(x %>% select(-description), digits = 2) %>% paste(collapse = "\n") %>% cat()
-  cat("\n")
-  cat("\n")
+  cat("\n\n")
   cat(x$description)
   cat("\n")
   
