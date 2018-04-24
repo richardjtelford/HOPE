@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 library("tidyverse")
 
 source("R/make_stratplot.R")
+source("R/make_summary_plot.R")
 ```
 
 ```{r load_data, warning = FALSE}
@@ -75,19 +76,57 @@ sites_meta <- sites_meta %>%
   filter(length == "Most Holocene")
 ```
 
+```{r spikes, warning = FALSE}
+combinedtaxonomy <- pollen_data %>% map_df("taxon.list") %>% distinct() %>% as_tibble()
 
-```{r plot_figure, results = 'asis', out.extra="angle=90", out.width = "600px", out.height="500px", cache = FALSE}
+spike_variables <- combinedtaxonomy %>% 
+  filter(ecological.group == "LABO") %>% 
+  select(-ecological.group, -taxon.group, -variable.context) %>% 
+  filter(!variable.element  %in% c("wet mass", "volume examined", "volume", "total", "pollen/spore", "number", "mounted volume", "dry mass", "dry mass examined"), 
+         !taxon.name %in% c("Author's pollen sum", "Sample quantity", "Number of lines", "Transects across slide", "Synthetic depth"))
+    
+spikes <- c(spike_variables$taxon.name, spike_variables$alias) 
+```
+
+
+```{r plot_figure, results = 'asis', warning = FALSE, message = FALSE, out.extra=c("angle=0", "angle=90"), out.width = c("400px", "600px"), out.height=c("400px", "500px"), cache = FALSE}
 for(i in sites_meta$dataset.id[1:5]) {
   x <- sites_meta %>% filter(dataset.id == i) %>% 
     select(site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
+  
+  #print site name and meta data
   cat("\n\n##", x$site.name, "\n\n")
   knitr::kable(x %>% select(-description), digits = 2) %>% paste(collapse = "\n") %>% cat()
-  cat("\n\n")
-  cat(x$description)
-  cat("\n")
+  cat("\n\n", x$description, "\n\n")
   
+  
+  #has charcoal
+  taxon_names <- pollen_data[[as.character(i)]]$taxon.list
+  if(any(taxon_names$ecological.group == "CHAR")){
+    cat("Charcoal counts in pollen data = TRUE\n\n")
+  } else{
+    cat("Charcoal counts in pollen data = FALSE\n\n")
+  }
+  
+  #has spike
+  lab.names <- pollen_data[[as.character(i)]]$lab.data %>% names
+  spi <- intersect(lab.names, spikes)
+  if(length(spi) > 0){ 
+    cat("Spike variables", spi, "\n\n")
+  } else{
+    cat("No declared spike\n\n")
+  }
+  
+  #summary diagram
+  p <- make_summary_plot(
+    pollen_data[[as.character(i)]], yaxis = "depth", group = wanted)
+  print(p)
+  
+   cat("\n\n\\pagebreak\n\n")
+  
+  #need to truncate age
   make_stratplot(
-    pollen_data[[as.character(i)]], yaxis = "age", y.rev = TRUE, 
+    pollen_data[[as.character(i)]], yaxis = "depth", y.rev = TRUE, 
     method = "percent", group = wanted,
     scale.percent = TRUE,
     exag = TRUE, exag.mult  = 10, 

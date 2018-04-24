@@ -13,10 +13,14 @@ make_stratplot <- function (x, yaxis = "age", method = "none", group = NULL, ...
       filter(ecological.group %in% group) %>% 
       arrange(ecological.group)
     
-    taxa <- x$taxon.list$taxon.name
-  
-  }
-  else {
+    if(any(colnames(x$taxon.list) == "alias")){#use alias if any
+      taxa <- x$taxon.list$alias
+    }else {
+      taxa <- x$taxon.list$taxon.name
+    }
+    
+               
+  } else {
     taxa <- x$taxon.list$taxon.name[!x$taxon.list$ecological.group %in% 
                                       "LABO"]
   }
