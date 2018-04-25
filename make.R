@@ -10,7 +10,7 @@ produce_regional_pollen_diagrams <- function(region, ..., open_pdf = FALSE){
     ...
   )
   if(isTRUE(open_pdf)){
-    system("evince pollen_diagrams.pdf")
+    system("evince pollen_diagrams.pdf", wait = FALSE)
   }
 }
 
