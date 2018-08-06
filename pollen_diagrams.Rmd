@@ -12,7 +12,7 @@ params:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, cache = FALSE)
 ```
 
 
@@ -91,8 +91,9 @@ spikes <- c(spike_variables$taxon.name, spike_variables$alias)
 
 ```{r plot_figure, results = 'asis', warning = FALSE, message = FALSE, out.extra=c("angle=0", "angle=90"), out.width = c("400px", "600px"), out.height=c("400px", "500px"), cache = FALSE}
 for(i in sites_meta$dataset.id[1:5]) {
-  x <- sites_meta %>% filter(dataset.id == i) %>% 
-    select(site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
+  x <- sites_meta %>% 
+    filter(dataset.id == i) %>% 
+    select(dataset.id, site.name, long, lat, elev, description, age_min, age_max, res, DepEnvt)
   
   #print site name and meta data
   cat("\n\n##", x$site.name, "\n\n")
