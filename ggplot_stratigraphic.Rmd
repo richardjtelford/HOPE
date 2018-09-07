@@ -1,0 +1,142 @@
+---
+title: "Stratigraphic Plots in ggplot2"
+author: "Richard J. Telford"
+date: "May 18, 2018"
+output: 
+  html_document:
+    self_contained: false
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, message = FALSE, warning = FALSE)
+library("neotoma")
+library("tidyverse", quietly = TRUE)
+```
+
+`rioja::strat.plot` is a great tool for plotting stratigraphic plots in R, but sometimes it is not obvious how to do something I want, perhaps a summary panel showing the percent trees/shrubs/herbs. Of course, I could extend `strat.plot`, but I do all nearly all my figures with `ggplot` now and wouldn't know where to start.
+
+In this post, I'm going to show how to make a stratigraphic plot with `ggplot`.
+
+First I'm going to download the pollen data for Tsuolbmajavri (Seppä and Hicks, 2006) from Neotoma.
+
+```{r download}
+library("neotoma")
+library("tidyverse")
+
+#get dataset list
+siteID <- 15733
+pollen_sites <- get_dataset(datasettype = "pollen", x = siteID)
+
+#download_data
+pollen_data <- get_download(pollen_sites)
+pollen_data <- pollen_data[[1]]
+
+#species groups to plot
+wanted <- c("TRSH", "UPHE", "VACR", "SUCC", "PALM", "MANG")
+
+```
+
+Now I need to extract and combine the pollen count, the chronology and the taxon information from the downloaded neotoma data. I `gather` the data to make it into a long thin (tidy) table, filter the taxa that are in the ecological groups I want to plot and calculate percentages.  
+
+```{r process_data}
+thin_pollen <- bind_cols(
+  counts(pollen_data),
+  ages(pollen_data) %>% select(depth, age, age.type)
+) %>% 
+  gather(key = taxon, value = count, -depth, -age, -age.type) %>% 
+  left_join(pollen_data$taxon.list, c("taxon" = "taxon.name")) %>% 
+  filter(ecological.group %in% wanted) %>% 
+  mutate(ecological.group = factor(ecological.group, levels = wanted)) %>% 
+  group_by(age) %>% 
+  mutate(percent = count / sum(count) * 100)
+
+```
+
+Now I can plot the data after a little further processing: I'm selecting taxa that occur at least three times and with a maximum abundance of at least 3%, and making taxon into a factor so taxa from the same ecological group will plot together.
+
+I use `geom_area` twice, once to show the 10x the percent, once to show the percent. I then need to use `ylim` in `coord_flip` to truncate the axes at the maximum pollen abundance. The plot uses facets to show the taxa separately. 
+
+```{r plot}
+plot_data <- thin_pollen %>% 
+  mutate(taxon = factor(taxon, levels = unique(taxon[order(ecological.group)]))) %>% 
+  group_by(taxon) %>% 
+  filter(max(percent) >= 3, sum(percent > 0) >= 3) %>% 
+  ungroup() %>% 
+  mutate(shaddow = percent * 10, shaddow = if_else(shaddow > max(percent), max(percent), shaddow))
+  
+g <- ggplot(plot_data, aes(x = age, y = percent, fill = ecological.group)) +
+  geom_area(aes(y = shaddow), alpha = 0.3, show.legend = FALSE) +
+  geom_area(show.legend = FALSE) +
+  coord_flip() +
+  scale_x_reverse(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0, 0), breaks = scales::pretty_breaks(n = 2)) +
+  scale_fill_brewer(type = "qual", palette = "Set1", drop = FALSE) +
+  facet_grid(~ taxon, scales = "free", space = "free") +
+  labs(x = expression(Age~''^{14}*C~BP), y = "Percent", fill = "Group") + 
+  theme(strip.text.x = element_text(angle = 90, size = 7, hjust = 0, margin = unit(rep(1, 4), unit = "pt")), 
+        panel.spacing = unit(x = 1, units = "pt"),
+        axis.text.x = element_text(size = 7)
+        )
+g
+```
+
+
+I don't think that is too bad for a first attempt, but I think I'll stick to `rioja::strat.plot` most of the time. 
+
+
+
+
+```{r summary}
+summary_data <- thin_pollen %>% 
+  group_by(age, ecological.group) %>% 
+  summarise(sum = sum(percent)) %>% 
+  mutate(ecological.group = factor(ecological.group), 
+         ecological.group = factor(ecological.group, levels = wanted), 
+         summary = "Summary") 
+
+summary_plot <- summary_data %>% 
+  ggplot(aes(x = age, y = sum, fill = ecological.group, group = ecological.group)) +
+  geom_area(position = position_stack(reverse = TRUE), show.legend = FALSE) +
+  scale_x_reverse(expand = c(0.02, 0)) +
+  scale_y_continuous(expand = c(0.01, 0)) +
+  scale_fill_brewer(type = "qual", palette = "Set1", drop = FALSE) + 
+  coord_flip() +
+  facet_wrap(~summary)
+
+no_x <- theme(axis.text.y = element_blank(),
+              axis.title.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              plot.margin = unit(x = c(5.5, 5.5, 5.5, 0), units = "pt"), 
+              strip.text.x = element_text(angle = 90, size = 7, hjust = 0, vjust = 0, margin = unit(rep(1, 4), unit = "pt")),
+              axis.text.x = element_text(size = 7),
+              axis.title.x = element_blank())
+
+cowplot::plot_grid(g + theme(plot.margin = unit(x = c(5.5, 1, 5.5, 5.5), units = "pt")), 
+                   summary_plot + no_x, align = "h", rel_widths = c(85, 15), axis = c("t", "b"))
+```
+
+```{r sed_units, eval = FALSE}
+FaciesTypes <- get_table("FaciesTypes")
+AnalysisUnits <- get_table("AnalysisUnits")
+CollectionUnits <- get_table("CollectionUnits")
+```
+
+```{r, eval = FALSE}
+CollectionUnits %>%
+  filter(SiteID == siteID) %>% 
+  left_join(AnalysisUnits)
+
+```
+
+```{r}
+data_frame(unit = c("a", "b", "a", "c"), upper = c(0, 1, 1.2, 2), lower =c(1, 1.2, 2, 2.5)) %>% 
+  ggplot(aes(xmin = -Inf, xmax = Inf, ymin = lower, ymax = upper, fill = unit)) +
+  geom_rect() +
+  expand_limits(x = c(0, 1)) +
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+```
+
