@@ -2,6 +2,9 @@
 library("tidyverse")
 library("neotoma")
 
+#load data
+load("data/pollen.Rdata") 
+
 #render wrapper
 produce_regional_pollen_diagrams <- function(region, ..., open_pdf = FALSE){
   rmarkdown::render(

@@ -1,6 +1,7 @@
 make_summary_plot <- function (x, yaxis = "age", group = NULL, ...) 
 {
   counts <- counts(x)
+  names(counts) <- make.names(names(counts), unique = TRUE)
   if (!yaxis %in% c("depth", "age.older", "age.younger", "age")) {
     stop("You must provide a suitable variable name for the y axis.")
   }
@@ -23,7 +24,9 @@ make_summary_plot <- function (x, yaxis = "age", group = NULL, ...)
   
   #force to have only wanted levels in factor
   taxa <- taxa %>% 
-    mutate(ecological.group = factor(ecological.group, levels = wanted))  
+    mutate(ecological.group = factor(ecological.group, levels = wanted), 
+           taxon.name = make.names(taxon.name, unique = TRUE)
+           )  
   
   summary_percent <- counts %>% 
     mutate(y = x$sample.meta[, yaxis]) %>% 

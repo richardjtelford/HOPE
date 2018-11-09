@@ -1,4 +1,4 @@
-make_stratplot <- function (x, yaxis = "age", method = "none", group = NULL, ...) 
+make_stratplot <- function (x, yaxis = "age", method = "none", group = NULL, maxtaxa = 50, ...) 
 {
   counts <- counts(x)
   if (!yaxis %in% c("depth", "age.older", "age.younger", "age")) {
@@ -18,13 +18,30 @@ make_stratplot <- function (x, yaxis = "age", method = "none", group = NULL, ...
     }else {
       taxa <- x$taxon.list$taxon.name
     }
-    
-               
   } else {
-    taxa <- x$taxon.list$taxon.name[!x$taxon.list$ecological.group %in% 
-                                      "LABO"]
+    taxa <- x$taxon.list$taxon.name[!x$taxon.list$ecological.group %in% "LABO"]
   }
   y <- x$sample.meta[, yaxis]
-  counts <- analogue::tran(counts[, taxa], method = method)
-  rioja::strat.plot(counts, yvar = y, ...)
+
+  #make names unique
+  names(counts) <- make.names(names(counts), unique = TRUE)
+  
+  counts <- analogue::tran(counts[, make.names(taxa, unique = TRUE)], method = method)
+  
+  #make names unique
+  names(counts) <- make.names(names(counts), unique = TRUE)
+  
+  #deal with large number of taxa
+  nc <- ncol(counts)
+  if(nc > maxtaxa){
+    need_plots <- ceiling(nc/maxtaxa)
+    for(i in 1:need_plots){
+      keep <- 1:nc > (i - 1)/need_plots * nc & 1:nc <= i/need_plots * nc
+      rioja::strat.plot(counts[, keep], yvar = y, ...) 
+      if(i < need_plots){cat("\n\n\\pagebreak\n\n")}
+    }
+    
+  }else{
+    rioja::strat.plot(counts, yvar = y, ...)
+  }
 }
