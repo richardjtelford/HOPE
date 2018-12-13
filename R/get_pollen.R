@@ -31,6 +31,10 @@ get_pollen <- function(object, wanted_pollen){
 
 get_group <- function(object, wanted, pollen){
   what <- get_wanted(object, wanted = wanted)
-  what/rowSums(pollen) * 100
+  if(ncol(what) == 0){
+    return(NULL)
+  } else {
+    return(what/rowSums(pollen) * 100)
+  }
 }
 
