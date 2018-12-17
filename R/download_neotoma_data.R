@@ -81,11 +81,17 @@ import_neotoma_plan <- drake_plan(
   #pull out pollen etc
   pollen = pollen_data_clean %>% map(get_pollen, wanted = wanted_pollen),
   
-  ## need to subset away hopeless sites before next steps (datasets with no pollen in wanted ecological groups)
-  fungal = map2(pollen_data_clean, pollen, get_group, wanted = "FUNG")#,
+  fungal = map2(pollen_data_clean, pollen, get_group, wanted = "FUNG"),
  # charcoal = map2(pollen_data_clean, pollen, get_group, wanted = "CHAR") #no dataset has charcoal in counts - some have it in taxon.list
   
   #merge pollen types
+  regions = read_csv("data/region_bounding_boxes.csv"),
+  region_map = {mp <- map_data("world")
+                ggplot(regions, aes(xmin = long_min, xmax = long_max, ymin = lat_min, ymax = lat_max, fill = region)) +
+                  geom_map(map = mp, data = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey50") +
+                  geom_rect(alpha  = 0.5, show.legend = FALSE) + 
+                  coord_quickmap()}
+ 
 )
 
 import_conf <- drake_config(import_neotoma_plan)

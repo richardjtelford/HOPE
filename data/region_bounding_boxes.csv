@@ -1,0 +1,4 @@
+region, lat_min, lat_max, long_min, long_max
+N Europe,    60,      90,      -30, 60
+C Europe,    45,      60,      -30, 60
+S Europe,    35,      45,      -30, 60
