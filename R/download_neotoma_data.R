@@ -2,10 +2,12 @@
 library("drake")#load first to prevent conflicts
 library("tidyverse")
 library("neotoma")
+library("readr")
 
 #source functions
 source("R/get_sites_meta.R")
 source("R/get_pollen.R")
+source("R/merge_pollen_by_region.R")
 
 #drake configuration
 pkgconfig::set_config("drake::strings_in_dots" = "literals")
@@ -48,7 +50,7 @@ import_neotoma_plan <- drake_plan(
   
 
   ## get site_meta
-  sites_meta = get_sites_meta(pollen_sites_clean),
+  sites_meta = get_sites_meta(pollen_sites_clean, regions),
   
   
   
@@ -87,12 +89,19 @@ import_neotoma_plan <- drake_plan(
   #merge pollen types
   regions = read_csv("data/region_bounding_boxes.csv"),
   region_map = {mp <- map_data("world")
+                detach("package:maps")#conflicts with purrr
                 ggplot(regions, aes(xmin = long_min, xmax = long_max, ymin = lat_min, ymax = lat_max, fill = region)) +
                   geom_map(map = mp, data = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey50") +
                   geom_rect(alpha  = 0.5, show.legend = FALSE) + 
-                  coord_quickmap()}
- 
+                  geom_text(aes(x = (long_min + long_max)/2, y = (lat_min + lat_max)/2, label = region)) + 
+                  coord_quickmap() + 
+                  scale_x_continuous(expand = c(0, 0)) + 
+                  scale_y_continuous(expand = c(0, 0)) +
+                  labs(x = "°E", y = "°N")},
+  taxonomic_merges = read_csv("data/region_merges.csv"),
+  merged_pollen = merge_pollen_by_region(pollen, taxonomic_merges, sites_meta)
 )
+#why do some dataset.id occur multiple times in sites_meta?
 
 import_conf <- drake_config(import_neotoma_plan)
 download_again <- FALSE

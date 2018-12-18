@@ -25,6 +25,7 @@
 #outputFiles
 *.csv
 !region_bounding_boxes.csv
+!region_merges.csv
 
 #datafile
 *.RData
