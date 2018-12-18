@@ -31,7 +31,6 @@ import_neotoma_plan <- drake_plan(
           res = n/(age_max - age_min) * 1000)
     },
     .id = "dataset.id") %>%
-    mutate(dataset.id = as.numeric(dataset.id)) %>%
     mutate(
       length = case_when(
         is.na(age_min) | is.infinite(age_min) ~ "none?",
@@ -43,10 +42,10 @@ import_neotoma_plan <- drake_plan(
       ),
   
   #drop datasets that fail rough_pass
-  pollen_sites_clean = pollen_sites[rough_selection$rough_pass],
+  pollen_sites_clean = pollen_sites[rough_selection$dataset.id[rough_selection$rough_pass]],
   
   #download_data
-  pollen_data_clean = pollen_data[rough_selection$rough_pass], 
+  pollen_data_clean = pollen_data[rough_selection$dataset.id[rough_selection$rough_pass]], 
   
 
   ## get site_meta
@@ -91,8 +90,9 @@ import_neotoma_plan <- drake_plan(
   region_map = {mp <- map_data("world")
                 detach("package:maps")#conflicts with purrr
                 ggplot(regions, aes(xmin = long_min, xmax = long_max, ymin = lat_min, ymax = lat_max, fill = region)) +
-                  geom_map(map = mp, data = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey50") +
+                  geom_map(map = mp, data = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey50", colour = "grey30") +
                   geom_rect(alpha  = 0.5, show.legend = FALSE) + 
+                  geom_point(aes(x = long, y = lat), data = sites_meta, colour = scales::muted("red"), inherit.aes = FALSE) +
                   geom_text(aes(x = (long_min + long_max)/2, y = (lat_min + lat_max)/2, label = region)) + 
                   coord_quickmap() + 
                   scale_x_continuous(expand = c(0, 0)) + 
@@ -100,8 +100,11 @@ import_neotoma_plan <- drake_plan(
                   labs(x = "°E", y = "°N")},
   taxonomic_merges = read_csv("data/region_merges.csv"),
   merged_pollen = merge_pollen_by_region(pollen, taxonomic_merges, sites_meta)
+ #get merges - check sensible
 )
-#why do some dataset.id occur multiple times in sites_meta?
+#why do some dataset.id occur multiple times in sites_meta? - duplicate collection units??
+
+
 
 import_conf <- drake_config(import_neotoma_plan)
 download_again <- FALSE
