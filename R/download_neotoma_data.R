@@ -86,7 +86,7 @@ import_neotoma_plan <- drake_plan(
  # charcoal = map2(pollen_data_clean, pollen, get_group, wanted = "CHAR") #no dataset has charcoal in counts - some have it in taxon.list
   
   #merge pollen types
-  regions = read_csv("data/region_bounding_boxes.csv"),
+  regions = read_csv(file_in("data/region_bounding_boxes.csv")),
   region_map = {mp <- map_data("world")
                 detach("package:maps")#conflicts with purrr
                 ggplot(regions, aes(xmin = long_min, xmax = long_max, ymin = lat_min, ymax = lat_max, fill = region)) +
@@ -98,7 +98,7 @@ import_neotoma_plan <- drake_plan(
                   scale_x_continuous(expand = c(0, 0)) + 
                   scale_y_continuous(expand = c(0, 0)) +
                   labs(x = "°E", y = "°N")},
-  taxonomic_merges = read_csv("data/region_merges.csv"),
+  taxonomic_merges = read_csv(file_in("data/region_merges.csv")),
   merged_pollen = merge_pollen_by_region(pollen, taxonomic_merges, sites_meta)
  #get merges - check sensible
 )
