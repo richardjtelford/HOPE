@@ -3,6 +3,7 @@ library("drake")#load first to prevent conflicts
 library("tidyverse")
 library("neotoma")
 library("readr")
+library("assertthat")
 
 #source functions
 source("R/get_sites_meta.R")
@@ -18,6 +19,8 @@ import_neotoma_plan <- drake_plan(
 
   #download_data
   pollen_data = pollen_sites %>% get_download(), #SLOW
+  
+  collection_units = get_collection_unit_depo_type(),
   
   ##rough age control
   rough_selection = pollen_data %>%
@@ -44,14 +47,12 @@ import_neotoma_plan <- drake_plan(
   #drop datasets that fail rough_pass
   pollen_sites_clean = pollen_sites[rough_selection$dataset.id[rough_selection$rough_pass]],
   
-  #download_data
+  #drop pollen data that fail rough_pass
   pollen_data_clean = pollen_data[rough_selection$dataset.id[rough_selection$rough_pass]], 
   
 
-  ## get site_meta
-  sites_meta = get_sites_meta(pollen_sites_clean, regions),
-  
-  
+  ## get metadata and make into nested tibble
+  sites_meta = get_sites_meta(pollen_sites = pollen_sites_clean, regions = regions, collection_units = collection_units),
   
   #get best chronology
   
@@ -80,9 +81,9 @@ import_neotoma_plan <- drake_plan(
   
     
   #pull out pollen etc
-  pollen = pollen_data_clean %>% map(get_pollen, wanted = wanted_pollen),
+#  pollen = pollen_data_clean %>% map(get_pollen, wanted = wanted_pollen),
   
-  fungal = map2(pollen_data_clean, pollen, get_group, wanted = "FUNG"),
+#  fungal = map2(pollen_data_clean, pollen, get_group, wanted = "FUNG"),
  # charcoal = map2(pollen_data_clean, pollen, get_group, wanted = "CHAR") #no dataset has charcoal in counts - some have it in taxon.list
   
   #merge pollen types
@@ -104,10 +105,10 @@ import_neotoma_plan <- drake_plan(
 )
 #why do some dataset.id occur multiple times in sites_meta? - duplicate collection units??
 
-
+#merges makes names unique - foiling plan
 
 import_conf <- drake_config(import_neotoma_plan)
 download_again <- FALSE
 make(import_neotoma_plan, trigger = trigger(condition = download_again))
 vis_drake_graph(import_conf, targets_only = TRUE)
-
+q
