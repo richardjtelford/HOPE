@@ -51,33 +51,89 @@ which_region <- function(regions, long, lat){
   return(region)
 }
 
-get_pollen_etc <- function(sites_meta, pollen_data){
+mk_merge_dictionary <- function(meta_pollen, merges){
+  #get all names in use
+  old_names <- meta_pollen %>% 
+    select(region, raw_thin_counts) %>% 
+    unnest() %>% 
+    filter(variable.element == "pollen") %>% 
+    select(-sampleID, -count) %>% 
+    distinct() %>% 
+    group_by(region) %>% 
+    nest(.key = taxon)
+  
+  #prepare regular expression
+  merges <- merges %>% 
+    group_by(region) %>% 
+    summarise(expres = paste0(".*(", paste(merge, collapse = "|"), ").*"))
+  
+  #get merged names by region
+  left_join(old_names, merges, by = "region") %>% 
+    mutate(taxon = map2(taxon, expres, ~mutate(.x, new_taxa = gsub(.y, "\\1", taxa)))) %>% 
+    unnest() %>% 
+    filter(taxa != new_taxa) %>% 
+    select(region, taxa, new_taxa) %>% 
+    group_by(region) %>% 
+    nest(.key = merges)
+}
+
+get_pollen_etc <- function(sites_meta, pollen_data, wanted){
   #check everything matches
-  assert_that(are_equal(sites_meta$dataset.id, names(pollen_data)))
+  assert_that(are_equal(as.character(sites_meta$dataset.id), names(pollen_data)))
   
   #add pollen data
   #chronology
   #labdata
   sites_meta_pollen <- sites_meta %>% 
     mutate(
-      raw_data = map(pollen_data, gather_data),
+      raw_counts = map(pollen_data, counts),
+      
       chronologies = map(pollen_data, "chronologies"),
-      lab_data = map(pollen_data, "lab.data"))
+      lab_data = map(pollen_data, "lab.data"),
+      taxonomy = map(pollen_data, "taxon.list"), 
+      raw_thin_counts = map2(raw_counts, taxonomy, mk_thin_pollen))
+      
   return(sites_meta_pollen)
 }
 
+process_meta_pollen <- function(meta_pollen, merge_dictionary){
+  meta_pollen <- meta_pollen %>% 
+    left_join(merge_dictionary, by = "region") %>% 
+    mutate(
+      merged_thin_counts = map2(raw_thin_counts, merges, merge_taxa)#,
+      #merged_thin = map2(merged_thin_counts, calc_percent)
+  ) %>% 
+    select(-merges)
+  
+}
 
-gather_data <- function(x){
-  if(any(names(x$taxon.list) == "alias")){
+
+
+#todo
+#merge species by region
+#calculate percent for tree shrub herb etcraw_thin_counts, region, merge_taxa
+#calculate percent for ferns, charcoal etc
+#find charcoal data
+
+mk_thin_pollen <- function(counts, taxon.list){
+  if(any(names(taxon.list) == "alias")){
     name_column <- "alias"
   } else {
     name_column <- "taxon.name"
   }
   
-  counts(x) %>%
-    as_tibble(rownames = "sampleID") %>% 
+  counts %>%
+    rownames_to_column(var = "sampleID") %>% 
     gather(key = taxa, value = count, -sampleID) %>% 
     filter(count > 0) %>% 
-    left_join(x$taxon.list, by = c("taxa" = name_column))
+    left_join(taxon.list, by = c("taxa" = name_column)) %>% 
+    as_tibble()
 }
   
+merge_taxa <- function(thin_pollen, merges){
+  thin_pollen %>% 
+    left_join(merges, by = "taxa") %>% 
+    mutate(taxa = coalesce(new_taxa, taxa)) %>% 
+    group_by(sampleID, taxa, variable.units, variable.element, variable.context, taxon.group, ecological.group) %>% 
+    summarise(count = sum(count))
+}

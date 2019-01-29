@@ -99,11 +99,14 @@ import_neotoma_plan <- drake_plan(
                   scale_x_continuous(expand = c(0, 0)) + 
                   scale_y_continuous(expand = c(0, 0)) +
                   labs(x = "°E", y = "°N")},
+
+#taxonomic merges
   taxonomic_merges = read_csv(file_in("data/region_merges.csv")),
-  merged_pollen = merge_pollen_by_region(pollen, taxonomic_merges, sites_meta)
+  merge_dictionary = mk_merge_dictionary(meta_pollen, taxonomic_merges),
+
+  meta_pollen = get_pollen_etc(sites_meta, pollen_data_clean, wanted)
  #get merges - check sensible
 )
-#why do some dataset.id occur multiple times in sites_meta? - duplicate collection units??
 
 #merges makes names unique - foiling plan
 
@@ -111,4 +114,7 @@ import_conf <- drake_config(import_neotoma_plan)
 download_again <- FALSE
 make(import_neotoma_plan, trigger = trigger(condition = download_again))
 vis_drake_graph(import_conf, targets_only = TRUE)
-q
+
+
+#known problems
+  #Betula/Corylus/Myrica becomes Corylus (longest option) 
