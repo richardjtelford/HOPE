@@ -1,5 +1,6 @@
 ## load packages ####
 library("drake")#load first to prevent conflicts
+library("maps")
 library("tidyverse")
 library("neotoma")
 library("readr")

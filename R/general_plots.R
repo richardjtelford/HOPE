@@ -1,6 +1,6 @@
+#plot showing regions
 plot_region_map <- function(regions, sites_meta){
   mp <- map_data("world")
-  detach("package:maps")#conflicts with purrr
   ggplot(regions, aes(xmin = long_min, xmax = long_max, ymin = lat_min, ymax = lat_max, fill = region)) +
     geom_map(map = mp, data = mp, aes(map_id = region), inherit.aes = FALSE, fill = "grey50", colour = "grey30") +
     geom_rect(alpha  = 0.5, show.legend = FALSE) + 
