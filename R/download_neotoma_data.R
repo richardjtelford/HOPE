@@ -8,7 +8,6 @@ library("assertthat")
 #source functions
 source("R/get_sites_meta.R")
 source("R/get_pollen.R")
-source("R/merge_pollen_by_region.R")
 
 #drake configuration
 pkgconfig::set_config("drake::strings_in_dots" = "literals")
@@ -38,8 +37,10 @@ import_neotoma_plan <- drake_plan(
       length = case_when(
         is.na(age_min) | is.infinite(age_min) ~ "none?",
         age_max - age_min < 4000 ~ "short",
+        age_max < 5000 ~ "Late Holocene",
         age_min < 2000 & age_max > 8000 ~ "Most Holocene",
-        age_min > 8000 ~ "Late Glacial",
+        age_min > 6000 ~ "Early Holocene",
+        age_min > 9000 ~ "Late Glacial",
         TRUE ~"part Holocene"),
       rough_pass = length %in% c("Most Holocene", "part Holocene") & n > 16
       ),
@@ -77,7 +78,7 @@ import_neotoma_plan <- drake_plan(
     select(-starts_with("RecDate")),
   
   #ecological groups
-  wanted_pollen = c("TRSH", "UPHE", "VACR", "SUCC", "PALM", "MANG"),
+  wanted_pollen = c("TRSH", "UPHE", "SUCC", "PALM", "MANG"),
   
     
   #pull out pollen etc
@@ -104,8 +105,8 @@ import_neotoma_plan <- drake_plan(
   taxonomic_merges = read_csv(file_in("data/region_merges.csv")),
   merge_dictionary = mk_merge_dictionary(meta_pollen, taxonomic_merges),
 
-  meta_pollen = get_pollen_etc(sites_meta, pollen_data_clean, wanted)
- #get merges - check sensible
+  meta_pollen = get_pollen_etc(sites_meta, pollen_data_clean, wanted),
+  processed_pollen = process_meta_pollen(meta_pollen, merge_dictionary, wanted = wanted_pollen)
 )
 
 #merges makes names unique - foiling plan

@@ -96,15 +96,17 @@ get_pollen_etc <- function(sites_meta, pollen_data, wanted){
   return(sites_meta_pollen)
 }
 
-process_meta_pollen <- function(meta_pollen, merge_dictionary){
+process_meta_pollen <- function(meta_pollen, merge_dictionary, wanted, min_count = 150){
   meta_pollen <- meta_pollen %>% 
     left_join(merge_dictionary, by = "region") %>% 
     mutate(
-      merged_thin_counts = map2(raw_thin_counts, merges, merge_taxa)#,
-      #merged_thin = map2(merged_thin_counts, calc_percent)
-  ) %>% 
+      merged_thin = map2(raw_thin_counts, merges, .f = merge_taxa),
+      merged_thin = map(merged_thin, .f = calc_percent, wanted = wanted),
+    #remove low counts
+      merged_thin = map(merged_thin, ~(filter(., pollen_sum >= min_count)))
+      ) %>% 
     select(-merges)
-  
+  return(meta_pollen)
 }
 
 
@@ -127,13 +129,36 @@ mk_thin_pollen <- function(counts, taxon.list){
     gather(key = taxa, value = count, -sampleID) %>% 
     filter(count > 0) %>% 
     left_join(taxon.list, by = c("taxa" = name_column)) %>% 
+    
+    #filter pollen/spores/ascospores - no charcoal in the counts 
+    filter(variable.element %in% c("pollen", "spores", "ascospore")) %>% 
     as_tibble()
 }
   
 merge_taxa <- function(thin_pollen, merges){
-  thin_pollen %>% 
+  if(is.null(merges)){
+    return(thin_pollen)
+  }
+  
+  merged_pollen <- thin_pollen %>% 
     left_join(merges, by = "taxa") %>% 
     mutate(taxa = coalesce(new_taxa, taxa)) %>% 
     group_by(sampleID, taxa, variable.units, variable.element, variable.context, taxon.group, ecological.group) %>% 
     summarise(count = sum(count))
+  return(merged_pollen)
+}
+
+calc_percent <- function(x, wanted){
+  thin_percent <- x %>%
+    filter(ecological.group %in% c(wanted, "VACR", "FUNG")) %>% 
+    mutate(group = if_else(ecological.group %in% wanted, "Terrestrial_Pollen", as.character(ecological.group))) %>% 
+    group_by(sampleID, group) %>%
+    mutate(group_sum = sum(count)) %>% 
+    group_by(sampleID) %>% 
+    mutate(
+      pollen_sum = first(group_sum[group == "Terrestrial_Pollen"]),
+      pollen_group = if_else(group == "Terrestrial_Pollen", pollen_sum, group_sum + pollen_sum), 
+      percent = count/pollen_group * 100)
+  
+  return(thin_percent)
 }
