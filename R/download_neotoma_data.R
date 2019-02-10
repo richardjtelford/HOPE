@@ -113,7 +113,9 @@ import_neotoma_plan <- drake_plan(
 
 import_conf <- drake_config(import_neotoma_plan)
 download_again <- FALSE
-make(import_neotoma_plan, trigger = trigger(condition = download_again))
+
+future::plan(future::multiprocess) #for parallel processing
+make(import_neotoma_plan, trigger = trigger(condition = download_again), jobs = 2, parallelism = "future")
 vis_drake_graph(import_conf, targets_only = TRUE)
 
 
