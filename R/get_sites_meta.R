@@ -1,3 +1,4 @@
+#get collection unit and depositional type 
 get_collection_unit_depo_type <- function(){
   ### download environment
   DepEnvtTypes0 <- get_table("DepEnvtTypes")
@@ -21,7 +22,7 @@ get_collection_unit_depo_type <- function(){
 }
   
 
-
+#get site meta data
 get_sites_meta <- function(pollen_sites, regions, collection_units){
   
   #extract site information
@@ -42,6 +43,7 @@ get_sites_meta <- function(pollen_sites, regions, collection_units){
   return(sites_meta) 
 }
 
+#find which region a site belongs to
 which_region <- function(regions, long, lat){
   region <- regions %>% 
     filter(long_min < long, long_max >= long, lat_min < lat, lat_max >= lat) %>% 
@@ -51,6 +53,7 @@ which_region <- function(regions, long, lat){
   return(region)
 }
 
+#make merge dictionary by region
 mk_merge_dictionary <- function(meta_pollen, merges){
   #get all names in use
   old_names <- meta_pollen %>% 
@@ -68,15 +71,17 @@ mk_merge_dictionary <- function(meta_pollen, merges){
     summarise(expres = paste0(".*(", paste(merge, collapse = "|"), ").*"))
   
   #get merged names by region
-  left_join(old_names, merges, by = "region") %>% 
+  regional_merges <- left_join(old_names, merges, by = "region") %>% 
     mutate(taxon = map2(taxon, expres, ~mutate(.x, new_taxa = gsub(.y, "\\1", taxa)))) %>% 
     unnest() %>% 
     filter(taxa != new_taxa) %>% 
     select(region, taxa, new_taxa) %>% 
     group_by(region) %>% 
     nest(.key = merges)
+  return(regional_merges)
 }
 
+#nest pollen data etc in meta data
 get_pollen_etc <- function(sites_meta, pollen_data, wanted){
   #check everything matches
   assert_that(are_equal(as.character(sites_meta$dataset.id), names(pollen_data)))
@@ -89,6 +94,8 @@ get_pollen_etc <- function(sites_meta, pollen_data, wanted){
       raw_counts = map(pollen_data, counts),
       
       chronologies = map(pollen_data, "chronologies"),
+      #NEED to select which chronology to use      
+      #NEED to add sample ID to chronologies and lab_data (where present)
       lab_data = map(pollen_data, "lab.data"),
       taxonomy = map(pollen_data, "taxon.list"), 
       raw_thin_counts = map2(raw_counts, taxonomy, mk_thin_pollen))
@@ -96,27 +103,24 @@ get_pollen_etc <- function(sites_meta, pollen_data, wanted){
   return(sites_meta_pollen)
 }
 
-process_meta_pollen <- function(meta_pollen, merge_dictionary, wanted, min_count = 150){
+#process pollen data to make percent, remove rows with <min_count grains etc
+process_meta_pollen <- function(meta_pollen, merge_dictionary, wanted, min_count = 150, max_age = 12000){
   meta_pollen <- meta_pollen %>% 
+    #NEED to filter time window (semijoin(raw_thin_counts, chronologies, by = "sampleID"))
     left_join(merge_dictionary, by = "region") %>% 
     mutate(
       merged_thin = map2(raw_thin_counts, merges, .f = merge_taxa),
       merged_thin = map(merged_thin, .f = calc_percent, wanted = wanted),
     #remove low counts
       merged_thin = map(merged_thin, ~(filter(., pollen_sum >= min_count)))
+    #NEED to filter chronologies and lab_data (where present) to match (semi_join)
       ) %>% 
-    select(-merges)
+    select(-merges, -raw_counts, -raw_thin_counts)
   return(meta_pollen)
 }
 
 
-
-#todo
-#merge species by region
-#calculate percent for tree shrub herb etcraw_thin_counts, region, merge_taxa
-#calculate percent for ferns, charcoal etc
-#find charcoal data
-
+#make thin pollen using correct column of taxon.list
 mk_thin_pollen <- function(counts, taxon.list){
   if(any(names(taxon.list) == "alias")){
     name_column <- "alias"
@@ -124,7 +128,7 @@ mk_thin_pollen <- function(counts, taxon.list){
     name_column <- "taxon.name"
   }
   
-  counts %>%
+  thin_pollen <- counts %>%
     rownames_to_column(var = "sampleID") %>% 
     gather(key = taxa, value = count, -sampleID) %>% 
     filter(count > 0) %>% 
@@ -133,8 +137,10 @@ mk_thin_pollen <- function(counts, taxon.list){
     #filter pollen/spores/ascospores - no charcoal in the counts 
     filter(variable.element %in% c("pollen", "spores", "ascospore")) %>% 
     as_tibble()
+  return(thin_pollen)
 }
   
+#merge taxa by region
 merge_taxa <- function(thin_pollen, merges){
   if(is.null(merges)){
     return(thin_pollen)
@@ -148,6 +154,7 @@ merge_taxa <- function(thin_pollen, merges){
   return(merged_pollen)
 }
 
+#calculate percent. 
 calc_percent <- function(x, wanted){
   thin_percent <- x %>%
     filter(ecological.group %in% c(wanted, "VACR", "FUNG")) %>% 

@@ -8,13 +8,13 @@ library("assertthat")
 
 #source functions
 source("R/get_sites_meta.R")
-source("R/get_pollen.R")
+#source("R/get_pollen.R")
 source("R/general_plots.R")
 
 #drake configuration
 pkgconfig::set_config("drake::strings_in_dots" = "literals")
 
-#drake plan
+#### drake plan ####
 import_neotoma_plan <- drake_plan(
   #get dataset list
   pollen_sites = get_dataset(datasettype = "pollen"),
@@ -82,6 +82,8 @@ import_neotoma_plan <- drake_plan(
   meta_pollen = get_pollen_etc(sites_meta, pollen_data_clean, wanted),
   processed_pollen = process_meta_pollen(meta_pollen, merge_dictionary, wanted = wanted_pollen)
 )#end of drake plan
+
+#### configure and make plan ####
 
 #configure plan
 import_conf <- drake_config(import_neotoma_plan)
